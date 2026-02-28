@@ -1,0 +1,40 @@
+{
+  "query": "SELECT device_id, LENGTH(data_json) as data_size, updated_at, SUBSTRING(data_json, 1, 200) as data_preview FROM device_data ORDER BY updated_at DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3BEbfAUaNTyQhky.b66781ffe5f7 --database Jo34GcZf2BaNokkJTAbf53 --execute SELECT device_id, LENGTH(data_json) as data_size, updated_at, SUBSTRING(data_json, 1, 200) as data_preview FROM device_data ORDER BY updated_at DESC LIMIT 5;",
+  "rows": [
+    {
+      "device_id": "web-1771716869758-pa4ylspkv",
+      "data_size": "1683",
+      "updated_at": "2026-02-22 01:35:02",
+      "data_preview": "{\"events\":[{\"title\":\"Call Danny\",\"date\":\"2026-02-23\",\"startTime\":\"10:00\",\"reminderMinutes\":15,\"id\":\"1771717226292-t4wmc4i\",\"createdAt\":\"2026-02-21T23:40:26.292Z\"}],\"rfps\":[],\"deals\":[],\"chatMessages\":"
+    },
+    {
+      "device_id": "web-1771546534590-d3ev6jrkc",
+      "data_size": "139",
+      "updated_at": "2026-02-22 00:34:43",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771719524089-4nnymjc9a",
+      "data_size": "850",
+      "updated_at": "2026-02-22 00:31:08",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[{\"role\":\"user\",\"content\":\"When’s the last time I saw Danny Evelyn\",\"id\":\"1771720242234-arimd9w\",\"createdAt\":\"2026-02-22T00:30:42.234Z\"},{\"role\":\"assis"
+    },
+    {
+      "device_id": "web-1771699271953-qgcihxh6z",
+      "data_size": "3697",
+      "updated_at": "2026-02-22 00:19:12",
+      "data_preview": "{\"events\":[{\"title\":\"Send out the delayed emails\",\"date\":\"2026-02-23\",\"startTime\":\"09:00\",\"reminderMinutes\":1,\"id\":\"1771699868407-0wz28r9\",\"createdAt\":\"2026-02-21T18:51:08.407Z\"}],\"rfps\":[{\"title\":\"Si"
+    },
+    {
+      "device_id": "web-1771719484205-5yhu101k4",
+      "data_size": "139",
+      "updated_at": "2026-02-22 00:18:33",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    }
+  ],
+  "messages": [],
+  "stdout": "device_id\tdata_size\tupdated_at\tdata_preview\nweb-1771716869758-pa4ylspkv\t1683\t2026-02-22 01:35:02\t{\"events\":[{\"title\":\"Call Danny\",\"date\":\"2026-02-23\",\"startTime\":\"10:00\",\"reminderMinutes\":15,\"id\":\"1771717226292-t4wmc4i\",\"createdAt\":\"2026-02-21T23:40:26.292Z\"}],\"rfps\":[],\"deals\":[],\"chatMessages\":\nweb-1771546534590-d3ev6jrkc\t139\t2026-02-22 00:34:43\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771719524089-4nnymjc9a\t850\t2026-02-22 00:31:08\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[{\"role\":\"user\",\"content\":\"When’s the last time I saw Danny Evelyn\",\"id\":\"1771720242234-arimd9w\",\"createdAt\":\"2026-02-22T00:30:42.234Z\"},{\"role\":\"assis\nweb-1771699271953-qgcihxh6z\t3697\t2026-02-22 00:19:12\t{\"events\":[{\"title\":\"Send out the delayed emails\",\"date\":\"2026-02-23\",\"startTime\":\"09:00\",\"reminderMinutes\":1,\"id\":\"1771699868407-0wz28r9\",\"createdAt\":\"2026-02-21T18:51:08.407Z\"}],\"rfps\":[{\"title\":\"Si\nweb-1771719484205-5yhu101k4\t139\t2026-02-22 00:18:33\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\n",
+  "stderr": "",
+  "execution_time_ms": 62
+}

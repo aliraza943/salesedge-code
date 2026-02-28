@@ -1,0 +1,90 @@
+{
+  "query": "SELECT id, openId, name, email, role, lastSignedIn FROM users ORDER BY lastSignedIn DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3BEbfAUaNTyQhky.b66781ffe5f7 --database Jo34GcZf2BaNokkJTAbf53 --execute SELECT id, openId, name, email, role, lastSignedIn FROM users ORDER BY lastSignedIn DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "90007",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:24"
+    },
+    {
+      "id": "90006",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:16"
+    },
+    {
+      "id": "90005",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:12"
+    },
+    {
+      "id": "90002",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:10"
+    },
+    {
+      "id": "90004",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:10"
+    },
+    {
+      "id": "90003",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:10"
+    },
+    {
+      "id": "90001",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "Jonathan Midura",
+      "email": "7b6tj6xbkk@privaterelay.appleid.com",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 17:20:05"
+    },
+    {
+      "id": "60003",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 16:30:52"
+    },
+    {
+      "id": "60001",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 16:30:51"
+    },
+    {
+      "id": "60002",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "NULL",
+      "email": "NULL",
+      "role": "admin",
+      "lastSignedIn": "2026-02-28 16:30:51"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\tname\temail\trole\tlastSignedIn\n90007\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 17:20:24\n90006\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 17:20:16\n90005\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 17:20:12\n90002\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 17:20:10\n90004\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 17:20:10\n90003\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 17:20:10\n90001\tAhSE6NvmQUFPtYSyw83TTz\tJonathan Midura\t7b6tj6xbkk@privaterelay.appleid.com\tadmin\t2026-02-28 17:20:05\n60003\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 16:30:52\n60001\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 16:30:51\n60002\tAhSE6NvmQUFPtYSyw83TTz\tNULL\tNULL\tadmin\t2026-02-28 16:30:51\n",
+  "stderr": "",
+  "execution_time_ms": 55
+}

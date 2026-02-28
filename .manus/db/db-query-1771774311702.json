@@ -1,0 +1,70 @@
+{
+  "query": "SELECT device_id, LENGTH(data_json) as data_size, updated_at, SUBSTRING(data_json, 1, 300) as data_preview FROM device_data WHERE LENGTH(data_json) > 100 ORDER BY updated_at DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3BEbfAUaNTyQhky.b66781ffe5f7 --database Jo34GcZf2BaNokkJTAbf53 --execute SELECT device_id, LENGTH(data_json) as data_size, updated_at, SUBSTRING(data_json, 1, 300) as data_preview FROM device_data WHERE LENGTH(data_json) > 100 ORDER BY updated_at DESC LIMIT 10;",
+  "rows": [
+    {
+      "device_id": "web-1771716869758-pa4ylspkv",
+      "data_size": "1657",
+      "updated_at": "2026-02-22 15:31:20",
+      "data_preview": "{\"events\":[{\"title\":\"Call Danny\",\"date\":\"2026-02-23\",\"startTime\":\"10:00\",\"reminderMinutes\":15,\"id\":\"1771717226292-t4wmc4i\",\"createdAt\":\"2026-02-21T23:40:26.292Z\"}],\"rfps\":[],\"deals\":[],\"chatMessages\":[{\"role\":\"user\",\"content\":\"Remind me on Friday to call my friend\",\"id\":\"1771774265810-rbec4hb\",\"crea"
+    },
+    {
+      "device_id": "web-1771768537526-3gsf46i16",
+      "data_size": "139",
+      "updated_at": "2026-02-22 13:57:26",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771546534590-d3ev6jrkc",
+      "data_size": "139",
+      "updated_at": "2026-02-22 13:54:37",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771711156748-evi5ua83m",
+      "data_size": "139",
+      "updated_at": "2026-02-22 02:00:44",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771724272972-8y5dycd86",
+      "data_size": "139",
+      "updated_at": "2026-02-22 01:37:53",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771719524089-4nnymjc9a",
+      "data_size": "850",
+      "updated_at": "2026-02-22 00:31:08",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[{\"role\":\"user\",\"content\":\"When’s the last time I saw Danny Evelyn\",\"id\":\"1771720242234-arimd9w\",\"createdAt\":\"2026-02-22T00:30:42.234Z\"},{\"role\":\"assistant\",\"content\":\"I'm sorry, I can only help with scheduling new events, RFPs, or deals. I don't have"
+    },
+    {
+      "device_id": "web-1771699271953-qgcihxh6z",
+      "data_size": "3697",
+      "updated_at": "2026-02-22 00:19:12",
+      "data_preview": "{\"events\":[{\"title\":\"Send out the delayed emails\",\"date\":\"2026-02-23\",\"startTime\":\"09:00\",\"reminderMinutes\":1,\"id\":\"1771699868407-0wz28r9\",\"createdAt\":\"2026-02-21T18:51:08.407Z\"}],\"rfps\":[{\"title\":\"Silly Technologies\",\"client\":\"Assured Partners\",\"brokerContact\":\"Lauren Barkley\",\"lives\":144,\"status\":"
+    },
+    {
+      "device_id": "web-1771719484205-5yhu101k4",
+      "data_size": "139",
+      "updated_at": "2026-02-22 00:18:33",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771711148188-0r4l1qhp4",
+      "data_size": "139",
+      "updated_at": "2026-02-21 23:43:23",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    },
+    {
+      "device_id": "web-1771717338256-h9l1jzafu",
+      "data_size": "139",
+      "updated_at": "2026-02-21 23:42:18",
+      "data_preview": "{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}"
+    }
+  ],
+  "messages": [],
+  "stdout": "device_id\tdata_size\tupdated_at\tdata_preview\nweb-1771716869758-pa4ylspkv\t1657\t2026-02-22 15:31:20\t{\"events\":[{\"title\":\"Call Danny\",\"date\":\"2026-02-23\",\"startTime\":\"10:00\",\"reminderMinutes\":15,\"id\":\"1771717226292-t4wmc4i\",\"createdAt\":\"2026-02-21T23:40:26.292Z\"}],\"rfps\":[],\"deals\":[],\"chatMessages\":[{\"role\":\"user\",\"content\":\"Remind me on Friday to call my friend\",\"id\":\"1771774265810-rbec4hb\",\"crea\nweb-1771768537526-3gsf46i16\t139\t2026-02-22 13:57:26\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771546534590-d3ev6jrkc\t139\t2026-02-22 13:54:37\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771711156748-evi5ua83m\t139\t2026-02-22 02:00:44\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771724272972-8y5dycd86\t139\t2026-02-22 01:37:53\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771719524089-4nnymjc9a\t850\t2026-02-22 00:31:08\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[{\"role\":\"user\",\"content\":\"When’s the last time I saw Danny Evelyn\",\"id\":\"1771720242234-arimd9w\",\"createdAt\":\"2026-02-22T00:30:42.234Z\"},{\"role\":\"assistant\",\"content\":\"I'm sorry, I can only help with scheduling new events, RFPs, or deals. I don't have\nweb-1771699271953-qgcihxh6z\t3697\t2026-02-22 00:19:12\t{\"events\":[{\"title\":\"Send out the delayed emails\",\"date\":\"2026-02-23\",\"startTime\":\"09:00\",\"reminderMinutes\":1,\"id\":\"1771699868407-0wz28r9\",\"createdAt\":\"2026-02-21T18:51:08.407Z\"}],\"rfps\":[{\"title\":\"Silly Technologies\",\"client\":\"Assured Partners\",\"brokerContact\":\"Lauren Barkley\",\"lives\":144,\"status\":\nweb-1771719484205-5yhu101k4\t139\t2026-02-22 00:18:33\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771711148188-0r4l1qhp4\t139\t2026-02-21 23:43:23\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\nweb-1771717338256-h9l1jzafu\t139\t2026-02-21 23:42:18\t{\"events\":[],\"rfps\":[],\"deals\":[],\"chatMessages\":[],\"salesGoal\":{\"currentSales\":4900000,\"goalAmount\":12000000,\"goalDeadline\":\"2026-12-01\"}}\n",
+  "stderr": "",
+  "execution_time_ms": 82
+}

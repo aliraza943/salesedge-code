@@ -1,0 +1,21 @@
+{
+  "query": "SELECT * FROM users ORDER BY id DESC LIMIT 5;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3BEbfAUaNTyQhky.b66781ffe5f7 --database Jo34GcZf2BaNokkJTAbf53 --execute SELECT * FROM users ORDER BY id DESC LIMIT 5;",
+  "rows": [
+    {
+      "id": "1",
+      "openId": "AhSE6NvmQUFPtYSyw83TTz",
+      "name": "Jonathan Midura",
+      "email": "7b6tj6xbkk@privaterelay.appleid.com",
+      "loginMethod": "apple",
+      "role": "admin",
+      "createdAt": "2026-02-16 12:55:15",
+      "updatedAt": "2026-02-16 13:02:04",
+      "lastSignedIn": "2026-02-16 13:02:04"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\topenId\tname\temail\tloginMethod\trole\tcreatedAt\tupdatedAt\tlastSignedIn\n1\tAhSE6NvmQUFPtYSyw83TTz\tJonathan Midura\t7b6tj6xbkk@privaterelay.appleid.com\tapple\tadmin\t2026-02-16 12:55:15\t2026-02-16 13:02:04\t2026-02-16 13:02:04\n",
+  "stderr": "",
+  "execution_time_ms": 61
+}

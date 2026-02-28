@@ -1,0 +1,60 @@
+{
+  "query": "SELECT device_id, LENGTH(data_json) as data_size, updated_at FROM device_data ORDER BY updated_at DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3BEbfAUaNTyQhky.b66781ffe5f7 --database Jo34GcZf2BaNokkJTAbf53 --execute SELECT device_id, LENGTH(data_json) as data_size, updated_at FROM device_data ORDER BY updated_at DESC LIMIT 10;",
+  "rows": [
+    {
+      "device_id": "web-1771716869758-pa4ylspkv",
+      "data_size": "1683",
+      "updated_at": "2026-02-22 01:35:02"
+    },
+    {
+      "device_id": "web-1771546534590-d3ev6jrkc",
+      "data_size": "139",
+      "updated_at": "2026-02-22 00:34:43"
+    },
+    {
+      "device_id": "web-1771719524089-4nnymjc9a",
+      "data_size": "850",
+      "updated_at": "2026-02-22 00:31:08"
+    },
+    {
+      "device_id": "web-1771699271953-qgcihxh6z",
+      "data_size": "3697",
+      "updated_at": "2026-02-22 00:19:12"
+    },
+    {
+      "device_id": "web-1771719484205-5yhu101k4",
+      "data_size": "139",
+      "updated_at": "2026-02-22 00:18:33"
+    },
+    {
+      "device_id": "web-1771711148188-0r4l1qhp4",
+      "data_size": "139",
+      "updated_at": "2026-02-21 23:43:23"
+    },
+    {
+      "device_id": "web-1771717338256-h9l1jzafu",
+      "data_size": "139",
+      "updated_at": "2026-02-21 23:42:18"
+    },
+    {
+      "device_id": "web-1771716347094-d6nqrd7za",
+      "data_size": "438",
+      "updated_at": "2026-02-21 23:34:29"
+    },
+    {
+      "device_id": "web-1771698897580-wz56lt5yp",
+      "data_size": "590",
+      "updated_at": "2026-02-21 23:25:47"
+    },
+    {
+      "device_id": "web-1771713811224-f98g3qbum",
+      "data_size": "139",
+      "updated_at": "2026-02-21 22:43:58"
+    }
+  ],
+  "messages": [],
+  "stdout": "device_id\tdata_size\tupdated_at\nweb-1771716869758-pa4ylspkv\t1683\t2026-02-22 01:35:02\nweb-1771546534590-d3ev6jrkc\t139\t2026-02-22 00:34:43\nweb-1771719524089-4nnymjc9a\t850\t2026-02-22 00:31:08\nweb-1771699271953-qgcihxh6z\t3697\t2026-02-22 00:19:12\nweb-1771719484205-5yhu101k4\t139\t2026-02-22 00:18:33\nweb-1771711148188-0r4l1qhp4\t139\t2026-02-21 23:43:23\nweb-1771717338256-h9l1jzafu\t139\t2026-02-21 23:42:18\nweb-1771716347094-d6nqrd7za\t438\t2026-02-21 23:34:29\nweb-1771698897580-wz56lt5yp\t590\t2026-02-21 23:25:47\nweb-1771713811224-f98g3qbum\t139\t2026-02-21 22:43:58\n",
+  "stderr": "",
+  "execution_time_ms": 135
+}

@@ -1,0 +1,34 @@
+{
+  "query": "SELECT 'events' as tbl, COUNT(*) as cnt FROM events UNION ALL SELECT 'rfps', COUNT(*) FROM rfps UNION ALL SELECT 'brokers', COUNT(*) FROM brokers UNION ALL SELECT 'sales_goals', COUNT(*) FROM sales_goals UNION ALL SELECT 'deals', COUNT(*) FROM deals UNION ALL SELECT 'chat_messages', COUNT(*) FROM chat_messages;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway04.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3BEbfAUaNTyQhky.b66781ffe5f7 --database Jo34GcZf2BaNokkJTAbf53 --execute SELECT 'events' as tbl, COUNT(*) as cnt FROM events UNION ALL SELECT 'rfps', COUNT(*) FROM rfps UNION ALL SELECT 'brokers', COUNT(*) FROM brokers UNION ALL SELECT 'sales_goals', COUNT(*) FROM sales_goals UNION ALL SELECT 'deals', COUNT(*) FROM deals UNION ALL SELECT 'chat_messages', COUNT(*) FROM chat_messages;",
+  "rows": [
+    {
+      "tbl": "sales_goals",
+      "cnt": "0"
+    },
+    {
+      "tbl": "rfps",
+      "cnt": "0"
+    },
+    {
+      "tbl": "brokers",
+      "cnt": "0"
+    },
+    {
+      "tbl": "deals",
+      "cnt": "0"
+    },
+    {
+      "tbl": "events",
+      "cnt": "0"
+    },
+    {
+      "tbl": "chat_messages",
+      "cnt": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "tbl\tcnt\nsales_goals\t0\nrfps\t0\nbrokers\t0\ndeals\t0\nevents\t0\nchat_messages\t0\n",
+  "stderr": "",
+  "execution_time_ms": 60
+}

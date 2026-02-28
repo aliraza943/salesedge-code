@@ -1,0 +1,102 @@
+# Project TODO — Clean Rebuild
+
+- [x] Set up icon mappings for all 5 tabs + common icons
+- [x] Configure 5-tab navigation (Home, Chat, RFPs, Calendar, Sales)
+- [x] Build local-store.ts (AsyncStorage CRUD for events, rfps, deals, chat)
+- [x] Build data-provider.tsx (single React Context with stable refs)
+- [x] Build device-ID persistence (SecureStore native / localStorage web)
+- [x] Build server sync (device-data REST API integration)
+- [x] Build notification-manager.ts (schedule/cancel local notifications)
+- [x] Build Home screen (greeting, attack plan, quick actions, stats, PDF/Excel export)
+- [x] Build Calendar screen (month view, dot indicators, day events, add/edit modal)
+- [x] Build Chat screen (text input, voice input, AI action execution)
+- [x] Build RFP screen (stage groups, cards, quick stage move, add form)
+- [x] Build Sales screen (pipeline summary, deal list, add form)
+- [x] Build server routers (publicChat, voice transcribe, rfpSummarize)
+- [x] Build server device-data routes
+- [x] Build server excel-export routes
+- [x] Build server attack-plan-preview routes
+- [x] Generate app logo and update branding
+- [x] Write tests and verify all features
+- [x] Fix RFP save button not working
+- [x] Verify all save/submit buttons work across the app (Calendar, Sales, Chat)
+- [x] Fix chat-created events not showing on Calendar when navigating to the date
+- [x] Remove "Tell AI what's on your plate" section from Home screen
+- [x] Add sales goal tracker to Home screen (current sales, goal, remaining, daily target)
+- [x] Store current sales amount and goal in AsyncStorage (initial: $4,900,000 / $12,000,000)
+- [x] Calculate work days remaining from today through Dec 1, 2025 and daily sales target
+- [x] When RFP is moved to "sold", auto-add its premium to current sales total
+- [x] Recalculate daily target after each sold RFP update
+- [x] Fix RFP premium not updating sales goal tracker when moved to sold
+- [x] Fix chat-created events with dates not showing on calendar
+- [x] Remove RFP deadlines and deal closings from Calendar (show events only)
+- [x] Sales tab: remove lead/qualified/proposal/negotiation/closed/lost stages, show only sold deals
+- [x] Remove "Target: $12M by Dec 1, 2026 • 203 work days remaining" text from Sales Goal Tracker
+- [x] Fix chat→calendar: reminders created via AI chat must appear on calendar
+- [x] Make sales goal deadline editable in the Edit Sales Goal modal
+- [x] Add voice input to RFP form — dictate fields using keywords (case, broker, broker contact, lives, effective date, premium, notes)
+- [x] Parse voice transcript and auto-fill correct RFP form fields
+- [x] Format premium as dollars in the RFP form
+- [x] Add mic button to RFP create/edit form
+- [x] Enable automatic cloud sync — all local data backed up to server in real-time
+- [x] Sync events, RFPs, deals, sales goal, and chat to server after every write
+- [x] Load from server on app launch when available, fall back to local
+- [x] Ensure no data loss during sync (merge strategy)
+- [x] Redesign RFP tab to be voice-first — no typing required
+- [x] Replace text form with large mic button as primary input method
+- [x] Voice dictation auto-fills all fields: RFP name, broker, broker contact, lives, effective date, premium, notes
+- [x] Show parsed fields for review before saving
+- [x] Premium always displayed as dollars
+- [x] Fix Pipeline premium on Home screen to show only draft + recommended RFP premiums (not sold)
+- [x] Replace app logo with user's Sales Machine LGFSSU logo
+- [x] Fix calendar date parsing — chat reminders land on wrong date (usually a day or few days off)
+- [x] Fix home screen tile icon to show Sales Machine LGFSSU logo
+- [x] Add Brokers tab to bottom tab bar
+- [x] Broker list screen showing all brokers with search
+- [x] Broker detail screen with conversation notes log
+- [x] Add conversation/note to broker (text input)
+- [x] Link broker name to RFPs — when RFP is sold, broker gets credit
+- [x] Show broker stats: total sold premium, number of RFPs, number of sold cases
+- [x] Auto-create broker when new broker name appears on a sold RFP (via getOrCreateBroker)
+- [x] Replace app logo with new walking professional Version B logo
+- [x] Remove email and phone fields from Broker — keep only name + notes
+- [x] Add conversation summary to broker detail so user can quickly see last conversation
+- [x] AI assistant can access broker notes to answer questions like "when was the last time I saw Danny?"
+- [x] BUG: User data disappears when dev URL changes between sessions — FIXED: consolidated all data under stable master device ID, merged 12 events + 6 RFPs from fragmented entries
+- [x] RFP follow-up date: add date picker to set follow-up, auto-creates calendar event when date is selected
+- [x] BUG: Voice dictation (Tap to Dictate) not working on RFP create — fixed with native MediaRecorder on web
+- [x] Show visible field structure guide while recording so user can follow along (Case, Broker, Premium, etc.)
+- [x] Add Follow-Up Date to voice dictation parsing — auto-creates calendar event when spoken
+- [x] Follow-up calendar event should include the case name in the event title
+- [x] Tap a follow-up event on the calendar to jump to the linked RFP detail
+- [x] Color-code follow-up events with orange badge to distinguish from regular events
+- [x] Overdue follow-up alerts on Home screen — show past-due follow-ups in red
+- [x] Auto-populate Brokers tab when RFP is created — add brokerage and contact if they don't exist
+- [x] Show running list of all RFPs per broker in the Brokers tab detail view
+- [x] Rename "Broker" to "Brokerage" throughout the RFP section
+- [x] Ensure all RFP fields are editable — user must be able to manually edit any field if dictation fails
+- [x] Fix auto-broker creation: use brokerage contact (not brokerage name) as the broker entry in Brokers tab, with brokerage as the company
+- [x] Show brokerage company name under broker contact in Brokers tab list view
+- [x] Brokerage contact autocomplete in RFP form — suggest existing broker contacts
+- [x] Tap a broker's RFP in detail view to jump to that RFP
+- [x] BUG: Broker RFP matching too loose — FIXED: now matches strictly by broker contact name only
+- [x] BUG: Voice recording not working when user taps record button — FIXED: added web MediaRecorder support to Chat, both Chat and RFP now use native MediaRecorder on web
+- [x] When RFP is moved to sold status, it should automatically appear on the Sales tab
+- [x] Generate 1242x2688 App Store screenshots for all key screens
+- [x] Generate 1242x2688 App Store screenshots for all key screens
+- [x] Phase 1: Migrate data from AsyncStorage to cloud database
+- [x] Create database tables for RFPs, brokers, events, settings, sales goals
+- [x] Build tRPC API endpoints for all data CRUD operations
+- [x] Migrate mobile app data layer from AsyncStorage to cloud API calls
+- [x] Test migrated mobile app end-to-end
+- [x] Phase 2: Build React web dashboard with shared backend
+- [x] Web dashboard with same login, same data, desktop-optimized UI
+- [x] Fix timezone: auto-detect user's local timezone and display all dates/times correctly
+- [x] BUG: Web dashboard returns 404 on published domain — the published domain points to Expo Metro (port 8081), not the API server (port 3000). Dashboard is accessible via the API server URL.
+- [x] Rename app from LGFSSU to SalesEdge in all config files and screens
+- [x] Add app icon to the splash/loading screen
+- [x] BUG: Mobile app data not showing on web dashboard — FIXED: added bulk sync endpoint, auto-sync on login, always save locally as backup, cloud sync indicator on home screen
+- [ ] Make web dashboard accessible on the published domain (permanent URL)
+- [x] Provide zip file of updated project code
+- [x] Create privacy policy URL for App Store submission
+- [x] Create support URL for App Store submission
