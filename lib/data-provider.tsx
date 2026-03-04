@@ -50,7 +50,7 @@ export type SalesGoal = {
 
 const SALES_GOAL_KEY = "ai_planner_sales_goal";
 const DEFAULT_SALES_GOAL: SalesGoal = {
-  currentSales: 4900000,
+  currentSales: 0,
   goalAmount: 12000000,
   goalDeadline: "2026-12-01",
 };
@@ -320,8 +320,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             const savedGoal = await AsyncStorage.getItem(SALES_GOAL_KEY);
             if (savedGoal)
               setSalesGoal({ ...DEFAULT_SALES_GOAL, ...JSON.parse(savedGoal) });
-          } catch {}
-        } catch {}
+          } catch { }
+        } catch { }
         setIsLoading(false);
         requestNotificationPermissions();
       })();
@@ -386,7 +386,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     async (key: string, items: unknown[]) => {
       try {
         await AsyncStorage.setItem(key, JSON.stringify(items));
-      } catch {}
+      } catch { }
     },
     []
   );
@@ -1025,7 +1025,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             goalDeadline: parsed.goalDeadline || "2026-12-01",
           };
         }
-      } catch {}
+      } catch { }
 
       const hasLocalData = localEvents.length > 0 || localRfps.length > 0 || localDeals.length > 0 || localBrokers.length > 0;
       if (!hasLocalData && !localSalesGoal) {
@@ -1160,7 +1160,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const savedGoal = await AsyncStorage.getItem(SALES_GOAL_KEY);
         if (savedGoal)
           setSalesGoal({ ...DEFAULT_SALES_GOAL, ...JSON.parse(savedGoal) });
-      } catch {}
+      } catch { }
     }
   }, [
     eventsQuery,

@@ -6,7 +6,7 @@ import type { ExpoConfig } from "expo/config";
 // e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
 // Bundle ID can only contain letters, numbers, and dots
 // Android requires each dot-separated segment to start with a letter
-const rawBundleId = "space.manus.ai.planner.t20260215195326";
+const rawBundleId = "com.lgfssu.aiplanner";
 const bundleId =
   rawBundleId
     .replace(/[-_]/g, ".") // Replace hyphens/underscores with dots
@@ -24,7 +24,7 @@ const bundleId =
 // Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
 // e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
-const schemeFromBundleId = `manus${timestamp}`;
+const schemeFromBundleId = "aiplanner";
 
 const env = {
   // App branding - update these values directly (do not use env vars)
@@ -47,8 +47,14 @@ const config: ExpoConfig = {
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
+  updates: {
+  url: "https://u.expo.dev/694104c2-06f0-4320-b9ad-28f553fb7394"
+},
+runtimeVersion: {
+  policy: "appVersion"
+},
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: env.iosBundleId,
     "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
