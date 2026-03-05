@@ -203,218 +203,236 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer className="flex-1">
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Header */}
-        <View className="px-5 pt-4 pb-2">
-          <Text className="text-3xl font-bold" style={{ color: colors.foreground }}>
-            {getGreeting()}
-          </Text>
-          <View className="flex-row items-center mt-1 gap-2">
-            <Text className="text-base" style={{ color: colors.muted }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
-            </Text>
-            {isCloudMode && (
-              <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.success + '20' }}>
-                {isSyncing ? (
-                  <ActivityIndicator size={10} color={colors.primary} />
-                ) : (
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success }} />
-                )}
-                <Text className="text-[10px] font-medium" style={{ color: isSyncing ? colors.primary : colors.success }}>
-                  {isSyncing ? 'Syncing...' : 'Cloud'}
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+
+        {/* ═══════════════════════════════════════════════════
+            HEADER — Greeting + Date + Sync Badge
+            ═══════════════════════════════════════════════════ */}
+        <View style={s.headerContainer}>
+          <View style={s.headerRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[s.greeting, { color: colors.foreground }]}>
+                {getGreeting()}
+              </Text>
+              <View style={s.dateRow}>
+                <Text style={[s.dateText, { color: colors.muted }]}>
+                  {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
                 </Text>
+                {isCloudMode && (
+                  <View style={[s.syncBadge, { backgroundColor: isSyncing ? colors.primary + '15' : colors.success + '15' }]}>
+                    {isSyncing ? (
+                      <ActivityIndicator size={8} color={colors.primary} />
+                    ) : (
+                      <View style={[s.syncDot, { backgroundColor: colors.success }]} />
+                    )}
+                    <Text style={[s.syncText, { color: isSyncing ? colors.primary : colors.success }]}>
+                      {isSyncing ? 'Syncing' : 'Cloud'}
+                    </Text>
+                  </View>
+                )}
+                {!isCloudMode && (
+                  <View style={[s.syncBadge, { backgroundColor: colors.muted + '15' }]}>
+                    <View style={[s.syncDot, { backgroundColor: colors.muted }]} />
+                    <Text style={[s.syncText, { color: colors.muted }]}>Local</Text>
+                  </View>
+                )}
               </View>
-            )}
-            {!isCloudMode && (
-              <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.muted + '20' }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted }} />
-                <Text className="text-[10px] font-medium" style={{ color: colors.muted }}>Local</Text>
-              </View>
-            )}
+            </View>
           </View>
         </View>
 
-        {/* ═══ Sales Goal Tracker ═══ */}
-        <View className="px-5 mt-4">
-          <View className="rounded-2xl overflow-hidden" style={{ backgroundColor: colors.surface }}>
-            {/* Header row */}
-            <View className="flex-row items-center justify-between px-4 pt-4 pb-2">
-              <Text className="text-lg font-bold" style={{ color: colors.foreground }}>
-                Sales Goal Tracker
-              </Text>
-              <TouchableOpacity onPress={() => { haptic(); openEditGoalModal(); }} activeOpacity={0.7}>
-                <IconSymbol name="pencil" size={18} color={colors.muted} />
+        {/* ═══════════════════════════════════════════════════
+            SALES GOAL TRACKER — Hero Card
+            ═══════════════════════════════════════════════════ */}
+        <View style={s.sectionPadding}>
+          <View style={[s.goalCard, { backgroundColor: colors.primary }]}>
+            {/* Card header */}
+            <View style={s.goalHeader}>
+              <View style={s.goalTitleRow}>
+                <IconSymbol name="chart.line.uptrend.xyaxis" size={16} color="rgba(255,255,255,0.85)" />
+                <Text style={s.goalTitle}>Sales Goal Tracker</Text>
+              </View>
+              <TouchableOpacity onPress={() => { haptic(); openEditGoalModal(); }} activeOpacity={0.7} style={s.goalEditBtn}>
+                <IconSymbol name="pencil" size={14} color="rgba(255,255,255,0.7)" />
               </TouchableOpacity>
             </View>
 
+            {/* Big number */}
+            <Text style={s.goalBigNumber}>
+              {formatCurrencyLarge(salesGoal.currentSales)}
+            </Text>
+            <Text style={s.goalSubtext}>
+              of {formatCurrencyLarge(salesGoal.goalAmount)} goal
+            </Text>
+
             {/* Progress bar */}
-            <View className="px-4 pb-2">
-              <View className="flex-row items-center justify-between mb-2">
-                <Text className="text-xs font-medium" style={{ color: colors.muted }}>
-                  {formatCurrencyLarge(salesGoal.currentSales)} of {formatCurrencyLarge(salesGoal.goalAmount)}
-                </Text>
-                <Text className="text-xs font-bold" style={{ color: colors.primary }}>
-                  {salesCalc.progressPct.toFixed(1)}%
-                </Text>
+            <View style={s.goalProgressTrack}>
+              <View
+                style={[
+                  s.goalProgressFill,
+                  { width: `${Math.min(100, salesCalc.progressPct)}%` },
+                ]}
+              />
+            </View>
+            <Text style={s.goalProgressLabel}>
+              {salesCalc.progressPct.toFixed(1)}% achieved
+            </Text>
+
+            {/* Metrics row */}
+            <View style={s.goalMetricsRow}>
+              <View style={s.goalMetric}>
+                <Text style={s.goalMetricValue}>{formatCurrencyLarge(salesCalc.remaining)}</Text>
+                <Text style={s.goalMetricLabel}>Remaining</Text>
               </View>
-              <View className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: colors.border }}>
-                <View
-                  className="h-3 rounded-full"
-                  style={{
-                    backgroundColor: colors.primary,
-                    width: `${Math.min(100, salesCalc.progressPct)}%`,
-                  }}
-                />
+              <View style={[s.goalMetricDivider]} />
+              <View style={s.goalMetric}>
+                <Text style={s.goalMetricValue}>{salesCalc.workDaysLeft}</Text>
+                <Text style={s.goalMetricLabel}>Work Days</Text>
+              </View>
+              <View style={[s.goalMetricDivider]} />
+              <View style={s.goalMetric}>
+                <Text style={s.goalMetricValue}>{formatCurrencyLarge(Math.round(salesCalc.dailyTarget))}</Text>
+                <Text style={s.goalMetricLabel}>Daily Target</Text>
               </View>
             </View>
-
-            {/* Key metrics */}
-            <View className="flex-row px-2 pb-4 pt-2">
-              <View className="flex-1 items-center px-1">
-                <Text className="text-lg font-bold" style={{ color: colors.error }}>
-                  {formatCurrencyLarge(salesCalc.remaining)}
-                </Text>
-                <Text className="text-[10px] mt-0.5 text-center" style={{ color: colors.muted }}>
-                  Remaining
-                </Text>
-              </View>
-              <View className="flex-1 items-center px-1 border-l border-r" style={{ borderColor: colors.border }}>
-                <Text className="text-lg font-bold" style={{ color: colors.foreground }}>
-                  {salesCalc.workDaysLeft}
-                </Text>
-                <Text className="text-[10px] mt-0.5 text-center" style={{ color: colors.muted }}>
-                  Work Days Left
-                </Text>
-              </View>
-              <View className="flex-1 items-center px-1">
-                <Text className="text-lg font-bold" style={{ color: colors.success }}>
-                  {formatCurrencyLarge(Math.round(salesCalc.dailyTarget))}
-                </Text>
-                <Text className="text-[10px] mt-0.5 text-center" style={{ color: colors.muted }}>
-                  Daily Target
-                </Text>
-              </View>
-            </View>
-
-
           </View>
         </View>
 
-        {/* Stats Row */}
-        <View className="flex-row px-5 mt-4 gap-3">
-          <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: colors.surface }}>
-            <Text className="text-2xl font-bold" style={{ color: colors.primary }}>
-              {todayEvents.length}
-            </Text>
-            <Text className="text-xs mt-1" style={{ color: colors.muted }}>
-              Today's Events
-            </Text>
-          </View>
-          <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: colors.surface }}>
-            <Text className="text-2xl font-bold" style={{ color: colors.warning }}>
-              {activeRfps.length}
-            </Text>
-            <Text className="text-xs mt-1" style={{ color: colors.muted }}>
-              Active RFPs
-            </Text>
-          </View>
-          <View className="flex-1 rounded-2xl p-4" style={{ backgroundColor: colors.surface }}>
-            <Text className="text-2xl font-bold" style={{ color: colors.success }}>
-              {formatCurrency(String(pipelineValue))}
-            </Text>
-            <Text className="text-xs mt-1" style={{ color: colors.muted }}>
-              Pipeline
-            </Text>
+        {/* ═══════════════════════════════════════════════════
+            STATS ROW — 3 compact metric tiles
+            ═══════════════════════════════════════════════════ */}
+        <View style={[s.sectionPadding, { marginTop: 4 }]}>
+          <View style={s.statsRow}>
+            <View style={[s.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[s.statIconWrap, { backgroundColor: colors.primary + '12' }]}>
+                <IconSymbol name="calendar" size={16} color={colors.primary} />
+              </View>
+              <Text style={[s.statNumber, { color: colors.primary }]}>{todayEvents.length}</Text>
+              <Text style={[s.statLabel, { color: colors.muted }]}>Today</Text>
+            </View>
+            <View style={[s.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[s.statIconWrap, { backgroundColor: colors.warning + '12' }]}>
+                <IconSymbol name="doc.text.fill" size={16} color={colors.warning} />
+              </View>
+              <Text style={[s.statNumber, { color: colors.warning }]}>{activeRfps.length}</Text>
+              <Text style={[s.statLabel, { color: colors.muted }]}>Active RFPs</Text>
+            </View>
+            <View style={[s.statTile, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[s.statIconWrap, { backgroundColor: colors.success + '12' }]}>
+                <IconSymbol name="chart.line.uptrend.xyaxis" size={16} color={colors.success} />
+              </View>
+              <Text style={[s.statNumber, { color: colors.success }]}>{formatCurrency(String(pipelineValue))}</Text>
+              <Text style={[s.statLabel, { color: colors.muted }]}>Pipeline</Text>
+            </View>
           </View>
         </View>
 
-        {/* Overdue Follow-Ups */}
+        {/* ═══════════════════════════════════════════════════
+            OVERDUE FOLLOW-UPS — Alert Section
+            ═══════════════════════════════════════════════════ */}
         {overdueFollowUps.length > 0 && (
-          <View className="px-5 mt-5">
-            <View className="flex-row items-center mb-3">
-              <IconSymbol name="exclamationmark.triangle.fill" size={18} color={colors.error} />
-              <Text className="text-lg font-bold ml-2" style={{ color: colors.error }}>
-                Overdue Follow-Ups
-              </Text>
-              <View className="ml-2 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.error + "20" }}>
-                <Text className="text-xs font-bold" style={{ color: colors.error }}>
-                  {overdueFollowUps.length}
-                </Text>
+          <View style={[s.sectionPadding, { marginTop: 20 }]}>
+            <View style={[s.alertBanner, { backgroundColor: colors.error + '08', borderColor: colors.error + '20' }]}>
+              <View style={s.sectionHeader}>
+                <View style={[s.sectionIconWrap, { backgroundColor: colors.error + '15' }]}>
+                  <IconSymbol name="exclamationmark.triangle.fill" size={14} color={colors.error} />
+                </View>
+                <Text style={[s.sectionTitle, { color: colors.error }]}>Overdue Follow-Ups</Text>
+                <View style={[s.countBadge, { backgroundColor: colors.error }]}>
+                  <Text style={s.countBadgeText}>{overdueFollowUps.length}</Text>
+                </View>
               </View>
-            </View>
-            <View className="gap-2">
-              {overdueFollowUps.slice(0, 5).map((item) => (
-                <Pressable
-                  key={item.id}
-                  onPress={() => { haptic(); router.push("/(tabs)/rfps"); }}
-                  style={({ pressed }) => [
-                    styles.eventCard,
-                    { backgroundColor: colors.error + "08", borderLeftColor: colors.error, borderWidth: 1, borderColor: colors.error + "25", opacity: pressed ? 0.8 : 1 },
-                  ]}
-                >
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-xs font-bold" style={{ color: colors.error }}>
-                      {item.daysOverdue} day{item.daysOverdue !== 1 ? "s" : ""} overdue
+              <View style={{ gap: 8, marginTop: 12 }}>
+                {overdueFollowUps.slice(0, 5).map((item) => (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => { haptic(); router.push("/(tabs)/rfps"); }}
+                    style={({ pressed }) => [
+                      s.overdueCard,
+                      { backgroundColor: colors.surface, borderColor: colors.error + '30', opacity: pressed ? 0.85 : 1 },
+                    ]}
+                  >
+                    <View style={s.overdueCardHeader}>
+                      <View style={[s.overdueBadge, { backgroundColor: colors.error + '15' }]}>
+                        <Text style={[s.overdueBadgeText, { color: colors.error }]}>
+                          {item.daysOverdue}d overdue
+                        </Text>
+                      </View>
+                      <Text style={[s.overdueDateText, { color: colors.muted }]}>
+                        Due: {formatDateShortTz(item.followUpDate)}
+                      </Text>
+                    </View>
+                    <Text style={[s.overdueTitle, { color: colors.foreground }]} numberOfLines={1}>
+                      {item.title}
                     </Text>
-                    <Text className="text-[10px]" style={{ color: colors.muted }}>
-                      Due: {formatDateShortTz(item.followUpDate)}
+                    <Text style={[s.overdueSubtitle, { color: colors.muted }]}>
+                      {item.client}
                     </Text>
-                  </View>
-                  <Text className="text-base font-semibold mt-1" style={{ color: colors.foreground }} numberOfLines={1}>
-                    {item.title}
+                  </Pressable>
+                ))}
+                {overdueFollowUps.length > 5 && (
+                  <Text style={[s.moreText, { color: colors.muted }]}>
+                    +{overdueFollowUps.length - 5} more overdue
                   </Text>
-                  <Text className="text-xs mt-0.5" style={{ color: colors.muted }}>
-                    Brokerage: {item.client}
-                  </Text>
-                </Pressable>
-              ))}
-              {overdueFollowUps.length > 5 && (
-                <Text className="text-xs text-center" style={{ color: colors.muted }}>
-                  +{overdueFollowUps.length - 5} more overdue
-                </Text>
-              )}
+                )}
+              </View>
             </View>
           </View>
         )}
 
-        {/* Today's Schedule */}
-        <View className="px-5 mt-6">
-          <Text className="text-lg font-bold mb-3" style={{ color: colors.foreground }}>
-            Today's Schedule
-          </Text>
+        {/* ═══════════════════════════════════════════════════
+            TODAY'S SCHEDULE
+            ═══════════════════════════════════════════════════ */}
+        <View style={[s.sectionPadding, { marginTop: 24 }]}>
+          <View style={s.sectionHeader}>
+            <View style={[s.sectionIconWrap, { backgroundColor: colors.primary + '12' }]}>
+              <IconSymbol name="calendar" size={14} color={colors.primary} />
+            </View>
+            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Today's Schedule</Text>
+            {todayEvents.length > 0 && (
+              <View style={[s.countBadge, { backgroundColor: colors.primary }]}>
+                <Text style={s.countBadgeText}>{todayEvents.length}</Text>
+              </View>
+            )}
+          </View>
           {todayEvents.length === 0 ? (
-            <View className="rounded-2xl p-5 items-center" style={{ backgroundColor: colors.surface }}>
-              <IconSymbol name="calendar" size={32} color={colors.muted} />
-              <Text className="text-sm mt-2" style={{ color: colors.muted }}>
-                No events today
-              </Text>
+            <View style={[s.emptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <View style={[s.emptyIconWrap, { backgroundColor: colors.muted + '10' }]}>
+                <IconSymbol name="calendar" size={28} color={colors.muted} />
+              </View>
+              <Text style={[s.emptyTitle, { color: colors.muted }]}>No events today</Text>
+              <Text style={[s.emptySubtitle, { color: colors.muted }]}>Enjoy the open schedule or add something new</Text>
             </View>
           ) : (
-            <View className="gap-2">
-              {todayEvents.slice(0, 5).map((evt) => (
+            <View style={{ gap: 8, marginTop: 12 }}>
+              {todayEvents.slice(0, 5).map((evt, idx) => (
                 <Pressable
                   key={evt.id}
                   onPress={() => { haptic(); router.push("/(tabs)/calendar"); }}
                   style={({ pressed }) => [
-                    styles.eventCard,
-                    { backgroundColor: colors.surface, borderLeftColor: colors.primary, opacity: pressed ? 0.8 : 1 },
+                    s.scheduleCard,
+                    { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.85 : 1 },
                   ]}
                 >
-                  <Text className="text-xs font-semibold" style={{ color: colors.primary }}>
-                    {formatTimeRange(evt.startTime, evt.endTime) || "All Day"}
-                  </Text>
-                  <Text className="text-base font-semibold mt-1" style={{ color: colors.foreground }} numberOfLines={1}>
-                    {evt.title}
-                  </Text>
-                  {evt.description ? (
-                    <Text className="text-xs mt-0.5" style={{ color: colors.muted }} numberOfLines={1}>
-                      {evt.description}
+                  <View style={[s.scheduleAccent, { backgroundColor: colors.primary }]} />
+                  <View style={s.scheduleContent}>
+                    <Text style={[s.scheduleTime, { color: colors.primary }]}>
+                      {formatTimeRange(evt.startTime, evt.endTime) || "All Day"}
                     </Text>
-                  ) : null}
+                    <Text style={[s.scheduleTitle, { color: colors.foreground }]} numberOfLines={1}>
+                      {evt.title}
+                    </Text>
+                    {evt.description ? (
+                      <Text style={[s.scheduleDesc, { color: colors.muted }]} numberOfLines={1}>
+                        {evt.description}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <IconSymbol name="chevron.right" size={14} color={colors.muted} />
                 </Pressable>
               ))}
               {todayEvents.length > 5 && (
-                <Text className="text-xs text-center" style={{ color: colors.muted }}>
+                <Text style={[s.moreText, { color: colors.muted }]}>
                   +{todayEvents.length - 5} more events
                 </Text>
               )}
@@ -422,33 +440,37 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Urgent Items */}
+        {/* ═══════════════════════════════════════════════════
+            COMING UP — Urgent Items
+            ═══════════════════════════════════════════════════ */}
         {urgentItems.length > 0 && (
-          <View className="px-5 mt-6">
-            <Text className="text-lg font-bold mb-3" style={{ color: colors.foreground }}>
-              Coming Up
-            </Text>
-            <View className="gap-2">
+          <View style={[s.sectionPadding, { marginTop: 24 }]}>
+            <View style={s.sectionHeader}>
+              <View style={[s.sectionIconWrap, { backgroundColor: colors.warning + '12' }]}>
+                <IconSymbol name="clock.fill" size={14} color={colors.warning} />
+              </View>
+              <Text style={[s.sectionTitle, { color: colors.foreground }]}>Coming Up</Text>
+            </View>
+            <View style={{ gap: 8, marginTop: 12 }}>
               {urgentItems.map((item, i) => (
                 <View
                   key={i}
-                  className="flex-row items-center rounded-xl p-3"
-                  style={{ backgroundColor: colors.surface }}
+                  style={[s.urgentCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <View
-                    className="w-8 h-8 rounded-lg items-center justify-center mr-3"
-                    style={{ backgroundColor: item.color + "15" }}
-                  >
-                    <Text className="text-xs font-bold" style={{ color: item.color }}>
+                  <View style={[s.urgentDayBadge, { backgroundColor: item.color + '12' }]}>
+                    <Text style={[s.urgentDayNumber, { color: item.color }]}>
                       {item.days === 0 ? "!" : item.days}
                     </Text>
+                    <Text style={[s.urgentDayLabel, { color: item.color }]}>
+                      {item.days === 0 ? "" : item.days === 1 ? "day" : "days"}
+                    </Text>
                   </View>
-                  <View className="flex-1">
-                    <Text className="text-sm font-medium" style={{ color: colors.foreground }} numberOfLines={1}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.urgentTitle, { color: colors.foreground }]} numberOfLines={1}>
                       {item.title}
                     </Text>
-                    <Text className="text-xs" style={{ color: colors.muted }}>
-                      {item.label} — {item.days === 0 ? "Today" : item.days === 1 ? "Tomorrow" : `${item.days} days`}
+                    <Text style={[s.urgentSubtitle, { color: colors.muted }]}>
+                      {item.label} {item.days === 0 ? "— Today" : item.days === 1 ? "— Tomorrow" : ""}
                     </Text>
                   </View>
                 </View>
@@ -457,103 +479,118 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Quick Actions */}
-        <View className="px-5 mt-6">
-          <Text className="text-lg font-bold mb-3" style={{ color: colors.foreground }}>
-            Quick Actions
-          </Text>
-          <View className="gap-3">
+        {/* ═══════════════════════════════════════════════════
+            QUICK ACTIONS
+            ═══════════════════════════════════════════════════ */}
+        <View style={[s.sectionPadding, { marginTop: 24 }]}>
+          <View style={s.sectionHeader}>
+            <View style={[s.sectionIconWrap, { backgroundColor: colors.primary + '12' }]}>
+              <IconSymbol name="bolt.fill" size={14} color={colors.primary} />
+            </View>
+            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
+          </View>
+          <View style={{ gap: 10, marginTop: 12 }}>
             <TouchableOpacity
               onPress={() => { haptic(); router.push("/(tabs)/chat"); }}
-              activeOpacity={0.9}
-              style={[
-                styles.actionBtn,
-                { backgroundColor: colors.primary },
-              ]}
+              activeOpacity={0.85}
+              style={[s.primaryActionBtn, { backgroundColor: colors.primary }]}
             >
-              <IconSymbol name="mic.fill" size={20} color="#FFFFFF" />
-              <Text className="text-base font-semibold ml-3" style={{ color: "#FFFFFF" }}>
-                Talk to AI Assistant
-              </Text>
+              <View style={s.actionBtnIconWrap}>
+                <IconSymbol name="mic.fill" size={20} color="#FFFFFF" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.primaryActionTitle}>Talk to AI Assistant</Text>
+                <Text style={s.primaryActionSub}>Voice or text — manage your day hands-free</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={16} color="rgba(255,255,255,0.6)" />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => { haptic(); router.push("/weekly-summary"); }}
-              activeOpacity={0.8}
-              style={[
-                styles.actionBtn,
-                { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-              ]}
+              activeOpacity={0.85}
+              style={[s.secondaryActionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
             >
-              <IconSymbol name="calendar" size={20} color={colors.primary} />
-              <Text className="text-base font-semibold ml-3" style={{ color: colors.foreground }}>
-                Weekly Overview
-              </Text>
+              <View style={[s.actionBtnIconWrapOutline, { backgroundColor: colors.primary + '10' }]}>
+                <IconSymbol name="calendar" size={18} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.secondaryActionTitle, { color: colors.foreground }]}>Weekly Overview</Text>
+                <Text style={[s.secondaryActionSub, { color: colors.muted }]}>See your week at a glance</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={14} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Export Section */}
-        <View className="px-5 mt-6">
-          <Text className="text-lg font-bold mb-3" style={{ color: colors.foreground }}>
-            Export
-          </Text>
-          <View className="gap-2">
+        {/* ═══════════════════════════════════════════════════
+            EXPORT SECTION
+            ═══════════════════════════════════════════════════ */}
+        <View style={[s.sectionPadding, { marginTop: 24 }]}>
+          <View style={s.sectionHeader}>
+            <View style={[s.sectionIconWrap, { backgroundColor: colors.muted + '12' }]}>
+              <IconSymbol name="square.and.arrow.up" size={14} color={colors.muted} />
+            </View>
+            <Text style={[s.sectionTitle, { color: colors.foreground }]}>Export</Text>
+          </View>
+          <View style={[s.exportContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <TouchableOpacity
               onPress={() => { haptic(); handleAttackPlan(); }}
               disabled={exporting === "pdf"}
               activeOpacity={0.7}
-              style={[
-                styles.exportBtn,
-                { backgroundColor: colors.surface, opacity: exporting === "pdf" ? 0.7 : 1 },
-              ]}
+              style={[s.exportRow, { borderBottomColor: colors.border }]}
             >
-              {exporting === "pdf" ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <IconSymbol name="doc.text.fill" size={18} color={colors.primary} />
-              )}
-              <Text className="text-sm font-medium ml-3" style={{ color: colors.foreground }}>
-                Daily Attack Plan (PDF)
-              </Text>
+              <View style={[s.exportIconWrap, { backgroundColor: colors.primary + '10' }]}>
+                {exporting === "pdf" ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <IconSymbol name="doc.text.fill" size={16} color={colors.primary} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.exportTitle, { color: colors.foreground }]}>Daily Attack Plan</Text>
+                <Text style={[s.exportSub, { color: colors.muted }]}>PDF</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={14} color={colors.muted} />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => { haptic(); handleExcelExport("rfps"); }}
               disabled={exporting === "rfps"}
               activeOpacity={0.7}
-              style={[
-                styles.exportBtn,
-                { backgroundColor: colors.surface, opacity: exporting === "rfps" ? 0.7 : 1 },
-              ]}
+              style={[s.exportRow, { borderBottomColor: colors.border }]}
             >
-              {exporting === "rfps" ? (
-                <ActivityIndicator size="small" color={colors.success} />
-              ) : (
-                <IconSymbol name="doc.text.fill" size={18} color={colors.success} />
-              )}
-              <Text className="text-sm font-medium ml-3" style={{ color: colors.foreground }}>
-                RFPs & Sold Cases (Excel)
-              </Text>
+              <View style={[s.exportIconWrap, { backgroundColor: colors.success + '10' }]}>
+                {exporting === "rfps" ? (
+                  <ActivityIndicator size="small" color={colors.success} />
+                ) : (
+                  <IconSymbol name="doc.text.fill" size={16} color={colors.success} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.exportTitle, { color: colors.foreground }]}>RFPs & Sold Cases</Text>
+                <Text style={[s.exportSub, { color: colors.muted }]}>Excel</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={14} color={colors.muted} />
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => { haptic(); handleExcelExport("schedule"); }}
               disabled={exporting === "schedule"}
               activeOpacity={0.7}
-              style={[
-                styles.exportBtn,
-                { backgroundColor: colors.surface, opacity: exporting === "schedule" ? 0.7 : 1 },
-              ]}
+              style={s.exportRowLast}
             >
-              {exporting === "schedule" ? (
-                <ActivityIndicator size="small" color={colors.warning} />
-              ) : (
-                <IconSymbol name="calendar" size={18} color={colors.warning} />
-              )}
-              <Text className="text-sm font-medium ml-3" style={{ color: colors.foreground }}>
-                Schedule (Excel)
-              </Text>
+              <View style={[s.exportIconWrap, { backgroundColor: colors.warning + '10' }]}>
+                {exporting === "schedule" ? (
+                  <ActivityIndicator size="small" color={colors.warning} />
+                ) : (
+                  <IconSymbol name="calendar" size={16} color={colors.warning} />
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[s.exportTitle, { color: colors.foreground }]}>Schedule</Text>
+                <Text style={[s.exportSub, { color: colors.muted }]}>Excel</Text>
+              </View>
+              <IconSymbol name="chevron.right" size={14} color={colors.muted} />
             </TouchableOpacity>
           </View>
         </View>
@@ -561,21 +598,20 @@ export default function HomeScreen() {
 
       {/* ═══ Edit Sales Goal Modal ═══ */}
       <Modal visible={showEditGoal} animationType="slide" transparent>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <View className="rounded-t-3xl p-5 pb-10" style={{ backgroundColor: colors.background }}>
-            <View className="flex-row items-center justify-between mb-5">
+        <View style={s.modalOverlay}>
+          <View style={[s.modalContent, { backgroundColor: colors.background }]}>
+            <View style={s.modalHandle} />
+            <View style={s.modalHeader}>
               <TouchableOpacity onPress={() => setShowEditGoal(false)} activeOpacity={0.7}>
-                <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
+                <Text style={[s.modalCancel, { color: colors.muted }]}>Cancel</Text>
               </TouchableOpacity>
-              <Text className="text-lg font-bold" style={{ color: colors.foreground }}>Edit Sales Goal</Text>
+              <Text style={[s.modalTitle, { color: colors.foreground }]}>Edit Sales Goal</Text>
               <TouchableOpacity onPress={handleSaveGoal} activeOpacity={0.7}>
-                <Text className="text-base font-bold" style={{ color: colors.primary }}>Save</Text>
+                <Text style={[s.modalSave, { color: colors.primary }]}>Save</Text>
               </TouchableOpacity>
             </View>
 
-            <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
-              Current Sales ($)
-            </Text>
+            <Text style={[s.inputLabel, { color: colors.foreground }]}>Current Sales ($)</Text>
             <TextInput
               value={editCurrentSales}
               onChangeText={setEditCurrentSales}
@@ -583,13 +619,10 @@ export default function HomeScreen() {
               placeholder="e.g. 4900000"
               placeholderTextColor={colors.muted}
               returnKeyType="done"
-              className="rounded-xl p-4 mb-4 text-base"
-              style={{ backgroundColor: colors.surface, color: colors.foreground, borderWidth: 1, borderColor: colors.border }}
+              style={[s.input, { backgroundColor: colors.surface, color: colors.foreground, borderColor: colors.border }]}
             />
 
-            <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
-              Sales Goal ($)
-            </Text>
+            <Text style={[s.inputLabel, { color: colors.foreground }]}>Sales Goal ($)</Text>
             <TextInput
               value={editGoalAmount}
               onChangeText={setEditGoalAmount}
@@ -597,25 +630,21 @@ export default function HomeScreen() {
               placeholder="e.g. 12000000"
               placeholderTextColor={colors.muted}
               returnKeyType="done"
-              className="rounded-xl p-4 mb-4 text-base"
-              style={{ backgroundColor: colors.surface, color: colors.foreground, borderWidth: 1, borderColor: colors.border }}
+              style={[s.input, { backgroundColor: colors.surface, color: colors.foreground, borderColor: colors.border }]}
             />
 
-            <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
-              Goal Deadline (YYYY-MM-DD)
-            </Text>
+            <Text style={[s.inputLabel, { color: colors.foreground }]}>Goal Deadline (YYYY-MM-DD)</Text>
             <TextInput
               value={editDeadline}
               onChangeText={setEditDeadline}
               placeholder="e.g. 2026-12-01"
               placeholderTextColor={colors.muted}
               returnKeyType="done"
-              className="rounded-xl p-4 mb-4 text-base"
-              style={{ backgroundColor: colors.surface, color: colors.foreground, borderWidth: 1, borderColor: colors.border }}
+              style={[s.input, { backgroundColor: colors.surface, color: colors.foreground, borderColor: colors.border }]}
             />
 
-            <Text className="text-xs text-center mt-2" style={{ color: colors.muted }}>
-              Work days are counted Mon–Fri. Daily target = remaining ÷ work days left.
+            <Text style={[s.modalFootnote, { color: colors.muted }]}>
+              Work days are counted Mon-Fri. Daily target = remaining / work days left.
             </Text>
           </View>
         </View>
@@ -624,24 +653,481 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  eventCard: {
-    borderLeftWidth: 3,
-    borderRadius: 12,
-    padding: 14,
+// ═══════════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════════
+
+const s = StyleSheet.create({
+  /* ─── Header ─────────────────────────────────────────── */
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 4,
   },
-  actionBtn: {
+  headerRow: {
     flexDirection: "row",
+    alignItems: "center",
+  },
+  greeting: {
+    fontSize: 28,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+    gap: 8,
+  },
+  dateText: {
+    fontSize: 15,
+  },
+  syncBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 100,
+  },
+  syncDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+  },
+  syncText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+
+  /* ─── Section Shared ─────────────────────────────────── */
+  sectionPadding: {
+    paddingHorizontal: 20,
+    marginTop: 16,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  sectionIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 14,
-    paddingVertical: 16,
   },
-  exportBtn: {
+  sectionTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    flex: 1,
+  },
+  countBadge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 6,
+  },
+  countBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  moreText: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 4,
+  },
+
+  /* ─── Sales Goal Card (Hero) ─────────────────────────── */
+  goalCard: {
+    borderRadius: 20,
+    padding: 20,
+    overflow: "hidden",
+  },
+  goalHeader: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+  },
+  goalTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  goalTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "rgba(255,255,255,0.85)",
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  goalEditBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  goalBigNumber: {
+    fontSize: 36,
+    fontWeight: "800",
+    color: "#FFFFFF",
+    marginTop: 12,
+    letterSpacing: -1,
+  },
+  goalSubtext: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.7)",
+    marginTop: 2,
+  },
+  goalProgressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    marginTop: 16,
+    overflow: "hidden",
+  },
+  goalProgressFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FFFFFF",
+  },
+  goalProgressLabel: {
+    fontSize: 11,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 6,
+    textAlign: "right",
+  },
+  goalMetricsRow: {
+    flexDirection: "row",
+    marginTop: 18,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.15)",
+  },
+  goalMetric: {
+    flex: 1,
+    alignItems: "center",
+  },
+  goalMetricDivider: {
+    width: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  goalMetricValue: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: "#FFFFFF",
+  },
+  goalMetricLabel: {
+    fontSize: 10,
+    color: "rgba(255,255,255,0.6)",
+    marginTop: 2,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+
+  /* ─── Stats Row ──────────────────────────────────────── */
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  statTile: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 14,
+    alignItems: "center",
+    borderWidth: 1,
+  },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: "800",
+  },
+  statLabel: {
+    fontSize: 11,
+    marginTop: 2,
+    fontWeight: "500",
+  },
+
+  /* ─── Overdue Alert ──────────────────────────────────── */
+  alertBanner: {
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+  },
+  overdueCard: {
     borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    padding: 12,
+    borderWidth: 1,
+  },
+  overdueCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  overdueBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  overdueBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  overdueDateText: {
+    fontSize: 11,
+  },
+  overdueTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: 6,
+  },
+  overdueSubtitle: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  /* ─── Schedule Cards ─────────────────────────────────── */
+  scheduleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  scheduleAccent: {
+    width: 4,
+    alignSelf: "stretch",
+  },
+  scheduleContent: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  scheduleTime: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  scheduleTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: 3,
+  },
+  scheduleDesc: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  /* ─── Empty State ────────────────────────────────────── */
+  emptyCard: {
+    borderRadius: 16,
+    padding: 28,
+    alignItems: "center",
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  emptyIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: "center",
+  },
+
+  /* ─── Urgent Items ───────────────────────────────────── */
+  urgentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 14,
+    padding: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  urgentDayBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  urgentDayNumber: {
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  urgentDayLabel: {
+    fontSize: 8,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    marginTop: -1,
+  },
+  urgentTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  urgentSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+
+  /* ─── Quick Actions ──────────────────────────────────── */
+  primaryActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
+    padding: 16,
+    gap: 14,
+  },
+  actionBtnIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  primaryActionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FFFFFF",
+  },
+  primaryActionSub: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.65)",
+    marginTop: 2,
+  },
+  secondaryActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    gap: 14,
+  },
+  actionBtnIconWrapOutline: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondaryActionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  secondaryActionSub: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  /* ─── Export Section ─────────────────────────────────── */
+  exportContainer: {
+    borderRadius: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  exportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+    borderBottomWidth: 1,
+  },
+  exportRowLast: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    gap: 12,
+  },
+  exportIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  exportTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  exportSub: {
+    fontSize: 11,
+    marginTop: 1,
+  },
+
+  /* ─── Modal ──────────────────────────────────────────── */
+  modalOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(128,128,128,0.3)",
+    alignSelf: "center",
+    marginBottom: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 24,
+  },
+  modalCancel: {
+    fontSize: 15,
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+  },
+  modalSave: {
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  inputLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 6,
+  },
+  input: {
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    fontSize: 15,
+    borderWidth: 1,
+  },
+  modalFootnote: {
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 8,
   },
 });
