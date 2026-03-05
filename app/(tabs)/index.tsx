@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, Text, View, Pressable, TouchableOpacity, StyleSheet, Platform, Linking, Alert, ActivityIndicator, TextInput, Modal } from "react-native";
+import { ScrollView, Text, View, Pressable, TouchableOpacity, StyleSheet, Platform, Linking, Alert, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -561,7 +561,11 @@ export default function HomeScreen() {
 
       {/* ═══ Edit Sales Goal Modal ═══ */}
       <Modal visible={showEditGoal} animationType="slide" transparent>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
           <View className="rounded-t-3xl p-5 pb-10" style={{ backgroundColor: colors.background }}>
             <View className="flex-row items-center justify-between mb-5">
               <TouchableOpacity onPress={() => setShowEditGoal(false)} activeOpacity={0.7}>
@@ -618,7 +622,8 @@ export default function HomeScreen() {
               Work days are counted Mon–Fri. Daily target = remaining ÷ work days left.
             </Text>
           </View>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );

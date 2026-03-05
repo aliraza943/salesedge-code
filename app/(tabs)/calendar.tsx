@@ -11,6 +11,7 @@ import {
   Platform,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
@@ -427,7 +428,11 @@ export default function CalendarScreen() {
 
       {/* Add/Edit Event Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
           <View
             className="rounded-t-3xl px-5 pt-5 pb-10"
             style={{ backgroundColor: colors.background }}
@@ -522,7 +527,8 @@ export default function CalendarScreen() {
               </View>
             </ScrollView>
           </View>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Reminder Picker Modal */}
