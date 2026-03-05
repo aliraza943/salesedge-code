@@ -18,6 +18,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 
 import { ScreenContainer } from "@/components/screen-container";
+import { OutlookCalendarButton } from "@/components/OutlookCalendarButton";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useData } from "@/lib/data-provider";
@@ -175,6 +176,7 @@ export default function CalendarScreen() {
   const handleSave = async () => {
     if (!formTitle.trim()) return;
     let eventId: string;
+    const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     if (editingEvent) {
       await updateEventData(editingEvent.id, {
@@ -191,6 +193,7 @@ export default function CalendarScreen() {
         date: selectedDate,
         startTime: formStartTime.trim() || undefined,
         reminderMinutes: formReminder > 0 ? formReminder : undefined,
+        timezone: userTimezone,
       });
       eventId = newEvent.id;
     }
@@ -454,6 +457,9 @@ export default function CalendarScreen() {
                 <Text className="text-base font-semibold" style={{ color: colors.primary }}>Save</Text>
               </TouchableOpacity>
             </View>
+
+            {/* Outlook Calendar sync status */}
+            <OutlookCalendarButton compact style={{ marginBottom: 16 }} />
 
             <ScrollView style={{ maxHeight: 400 }}>
               <View className="gap-4">

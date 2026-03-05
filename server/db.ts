@@ -9,6 +9,7 @@ import {
   brokers, InsertBroker,
   brokerNotes, InsertBrokerNote,
   salesGoals, InsertSalesGoal,
+  outlookTokens,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -123,6 +124,13 @@ export async function updateEvent(id: number, userId: number, data: Partial<Inse
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   await db.update(events).set(data).where(and(eq(events.id, id), eq(events.userId, userId)));
+}
+
+export async function getEventById(id: number, userId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(events).where(and(eq(events.id, id), eq(events.userId, userId))).limit(1);
+  return result.length > 0 ? result[0] : undefined;
 }
 
 export async function deleteEvent(id: number, userId: number) {

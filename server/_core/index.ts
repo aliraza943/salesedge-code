@@ -62,6 +62,38 @@ async function startServer() {
   registerExcelRoutes(app);
   registerDeviceDataRoutes(app);
 
+  // ─── Outlook OAuth callback relay ──────────────────────────────────────────
+  // Microsoft redirects here after the user authenticates.
+  // We relay the `code` back to the app via a deep link or a small HTML page
+  // that postMessages the code to the opener (for web/in-app browser flows).
+  app.get("/api/outlook/callback", (req: import("express").Request, res: import("express").Response) => {
+    const code = req.query.code as string | undefined;
+    const error = req.query.error as string | undefined;
+
+    if (error || !code) {
+      res.status(400).send(`<html><body><h2>Outlook connection failed</h2><p>${error ?? "No code received"}</p></body></html>`);
+      return;
+    }
+
+    // Deliver the code back to the app via postMessage (works for expo-web-browser)
+    const redirectUri = encodeURIComponent(`${req.protocol}://${req.headers.host}/api/outlook/callback`);
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.send(`<!DOCTYPE html><html><head><title>Connecting Outlook...</title></head><body>
+<script>
+  const code = ${JSON.stringify(code)};
+  if (window.opener) {
+    window.opener.postMessage({ type: 'outlook_oauth_code', code }, '*');
+    window.close();
+  } else {
+    // Fallback: redirect back to app with code in URL fragment
+    const appUrl = window.location.origin.replace(/^(https?:\/\/)[^.]+/, '$1' + window.location.hostname.replace(/^[^-]+-/, '8081-'));
+    window.location.href = appUrl + '?outlook_code=' + encodeURIComponent(code);
+  }
+<\/script>
+<p>Connecting to Outlook... Please wait.</p>
+</body></html>`);
+  });
+
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
   });

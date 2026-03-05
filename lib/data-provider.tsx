@@ -153,7 +153,7 @@ type DataContextType = {
   ) => Promise<void>;
 
   createEvent: (
-    data: Omit<LocalEvent, "id" | "createdAt">
+    data: Omit<LocalEvent, "id" | "createdAt"> & { timezone?: string }
   ) => Promise<LocalEvent>;
   updateEvent: (
     id: string,
@@ -394,7 +394,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // ─── Event CRUD ────────────────────────────────────
 
   const createEvent = useCallback(
-    async (data: Omit<LocalEvent, "id" | "createdAt">) => {
+    async (data: Omit<LocalEvent, "id" | "createdAt"> & { timezone?: string }) => {
       if (isCloudRef.current) {
         try {
           const cloudId = await createEventMut.mutateAsync({
@@ -409,6 +409,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             sourceRfpId: data.sourceRfpId
               ? parseInt(data.sourceRfpId)
               : undefined,
+            timezone: data.timezone,
           });
           const newEvent: LocalEvent = {
             ...data,

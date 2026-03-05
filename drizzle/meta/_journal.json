@@ -8,6 +8,13 @@
       "when": 1772310586837,
       "tag": "0000_neat_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1772719468045,
+      "tag": "0004_outlook_integration",
+      "breakpoints": true
     }
   ]
 }

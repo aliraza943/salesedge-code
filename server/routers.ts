@@ -12,6 +12,15 @@ import {
   buildPublicChatSystemPrompt,
   buildRfpSummarizePrompt,
 } from "./prompt-helpers";
+import {
+  createOutlookEvent,
+  updateOutlookEvent,
+  deleteOutlookEvent,
+  exchangeCodeForTokens,
+  saveOutlookToken,
+  deleteOutlookToken,
+  getOutlookToken,
+} from "./outlook-calendar";
 
 function getDayOfWeek(dateStr: string): string {
   const days = [
@@ -66,11 +75,31 @@ export const appRouter = router({
           reminderMinutes: z.number().optional(),
           sourceType: z.string().optional(),
           sourceRfpId: z.number().optional(),
+          timezone: z.string().optional(),
         })
       )
-      .mutation(({ ctx, input }) =>
-        db.createEvent({ ...input, userId: ctx.user.id })
-      ),
+      .mutation(async ({ ctx, input }) => {
+        const { timezone, ...eventData } = input;
+        const eventId = await db.createEvent({ ...eventData, userId: ctx.user.id });
+        // Silently sync to Outlook if connected
+        try {
+          const outlookId = await createOutlookEvent(ctx.user.id, {
+            title: input.title,
+            description: input.description,
+            date: input.date,
+            startTime: input.startTime,
+            endTime: input.endTime,
+            allDay: input.allDay,
+            timezone,
+          });
+          if (outlookId) {
+            await db.updateEvent(eventId, ctx.user.id, { outlookEventId: outlookId });
+          }
+        } catch (err) {
+          console.error("[Outlook] Auto-sync create failed (non-fatal):", err);
+        }
+        return eventId;
+      }),
     update: protectedProcedure
       .input(
         z.object({
@@ -84,17 +113,44 @@ export const appRouter = router({
           reminderMinutes: z.number().optional(),
           sourceType: z.string().optional(),
           sourceRfpId: z.number().optional(),
+          timezone: z.string().optional(),
         })
       )
-      .mutation(({ ctx, input }) => {
-        const { id, ...data } = input;
-        return db.updateEvent(id, ctx.user.id, data);
+      .mutation(async ({ ctx, input }) => {
+        const { id, timezone, ...data } = input;
+        await db.updateEvent(id, ctx.user.id, data);
+        // Silently sync to Outlook if connected
+        try {
+          const existing = await db.getEventById(id, ctx.user.id);
+          if (existing?.outlookEventId) {
+            await updateOutlookEvent(ctx.user.id, existing.outlookEventId, {
+              title: data.title ?? existing.title,
+              description: data.description ?? existing.description ?? undefined,
+              date: data.date ?? existing.date,
+              startTime: data.startTime ?? existing.startTime ?? undefined,
+              endTime: data.endTime ?? existing.endTime ?? undefined,
+              allDay: data.allDay ?? existing.allDay,
+              timezone,
+            });
+          }
+        } catch (err) {
+          console.error("[Outlook] Auto-sync update failed (non-fatal):", err);
+        }
       }),
     delete: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(({ ctx, input }) =>
-        db.deleteEvent(input.id, ctx.user.id)
-      ),
+      .mutation(async ({ ctx, input }) => {
+        // Silently delete from Outlook if connected
+        try {
+          const existing = await db.getEventById(input.id, ctx.user.id);
+          if (existing?.outlookEventId) {
+            await deleteOutlookEvent(ctx.user.id, existing.outlookEventId);
+          }
+        } catch (err) {
+          console.error("[Outlook] Auto-sync delete failed (non-fatal):", err);
+        }
+        return db.deleteEvent(input.id, ctx.user.id);
+      }),
   }),
 
   // ─── RFPs ──────────────────────────────────────────────
@@ -904,6 +960,57 @@ export const appRouter = router({
               ? result.text
               : "Transcription failed",
         };
+      }),
+  }),
+
+  // ─── Outlook Calendar Integration ─────────────────────
+  outlook: router({
+    /** Returns connection status + connected email */
+    status: protectedProcedure.query(async ({ ctx }) => {
+      const token = await getOutlookToken(ctx.user.id);
+      return {
+        connected: !!token,
+        email: token?.outlookEmail ?? null,
+      };
+    }),
+
+    /** Exchange the auth code from the client for tokens and save them */
+    connect: protectedProcedure
+      .input(z.object({
+        code: z.string(),
+        redirectUri: z.string(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const clientId = process.env.MICROSOFT_CLIENT_ID;
+        const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+        if (!clientId || !clientSecret) {
+          throw new Error("Microsoft OAuth credentials not configured on the server.");
+        }
+        const tokens = await exchangeCodeForTokens(input.code, input.redirectUri);
+        await saveOutlookToken(ctx.user.id, tokens);
+        return { success: true, email: tokens.outlookEmail ?? null };
+      }),
+
+    /** Disconnect Outlook — removes stored tokens */
+    disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+      await deleteOutlookToken(ctx.user.id);
+      return { success: true };
+    }),
+
+    /** Get the Microsoft OAuth authorization URL to start the login flow */
+    getAuthUrl: protectedProcedure
+      .input(z.object({ redirectUri: z.string() }))
+      .query(({ input }) => {
+        const clientId = process.env.MICROSOFT_CLIENT_ID ?? "";
+        const tenantId = process.env.MICROSOFT_TENANT_ID ?? "common";
+        const url = new URL(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`);
+        url.searchParams.set("client_id", clientId);
+        url.searchParams.set("response_type", "code");
+        url.searchParams.set("redirect_uri", input.redirectUri);
+        url.searchParams.set("scope", "Calendars.ReadWrite offline_access User.Read");
+        url.searchParams.set("response_mode", "query");
+        url.searchParams.set("prompt", "select_account");
+        return { url: url.toString() };
       }),
   }),
 });

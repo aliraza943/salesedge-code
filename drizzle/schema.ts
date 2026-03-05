@@ -1,4 +1,4 @@
-import { boolean, decimal, int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { boolean, decimal, int, mysqlEnum, mysqlTable, text, timestamp, varchar, bigint } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -33,6 +33,7 @@ export const events = mysqlTable("events", {
   reminderMinutes: int("reminderMinutes"),
   sourceType: varchar("sourceType", { length: 32 }), // e.g. "follow-up"
   sourceRfpId: int("sourceRfpId"), // links back to originating RFP
+  outlookEventId: varchar("outlookEventId", { length: 512 }), // Microsoft Graph event ID
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -147,3 +148,21 @@ export const salesGoals = mysqlTable("sales_goals", {
 
 export type SalesGoal = typeof salesGoals.$inferSelect;
 export type InsertSalesGoal = typeof salesGoals.$inferInsert;
+
+/**
+ * Microsoft Outlook OAuth tokens — one row per user
+ */
+export const outlookTokens = mysqlTable("outlook_tokens", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().unique(),
+  accessToken: text("accessToken").notNull(),
+  refreshToken: text("refreshToken").notNull(),
+  expiresAt: bigint("expiresAt", { mode: "number" }).notNull(), // unix ms
+  outlookUserId: varchar("outlookUserId", { length: 128 }), // Microsoft user id
+  outlookEmail: varchar("outlookEmail", { length: 320 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type OutlookToken = typeof outlookTokens.$inferSelect;
+export type InsertOutlookToken = typeof outlookTokens.$inferInsert;
