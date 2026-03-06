@@ -95,7 +95,7 @@ runtimeVersion: {
     [
       "expo-audio",
       {
-        microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone.",
+          microphonePermission: "Allow $(PRODUCT_NAME) to access your microphone to record and transcribe your voice notes for RFP summaries and deal updates. For example, you can record a summary of a client meeting to automatically create a follow-up event.",
       },
     ],
     [
