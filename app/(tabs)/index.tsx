@@ -8,6 +8,7 @@ import { Image } from "expo-image";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useAuth } from "@/hooks/use-auth";
 import { useData } from "@/lib/data-provider";
 import { getGreeting, getTodayStr, formatTime, formatTimeRange, formatCurrency, formatCurrencyLarge, countWorkDays, daysUntil } from "@/lib/utils";
 import { parseLocalDate, formatDateShortTz } from "@/lib/timezone";
@@ -17,6 +18,7 @@ import { getApiBaseUrl } from "@/constants/oauth";
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { user } = useAuth();
   const { events, rfps, deals, isLoading, refreshAll, salesGoal, updateSalesGoal, isCloudMode, isSyncing, syncLocalToCloud } = useData();
   const [exporting, setExporting] = useState<string | null>(null);
   const [showEditGoal, setShowEditGoal] = useState(false);
@@ -205,11 +207,12 @@ export default function HomeScreen() {
     <ScreenContainer className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
-        <View className="px-5 pt-4 pb-2">
-          <Text className="text-3xl font-bold" style={{ color: colors.foreground }}>
-            {getGreeting()}
-          </Text>
-          <View className="flex-row items-center mt-1 gap-2">
+        <View className="px-5 pt-4 pb-2 flex-row justify-between items-start">
+          <View className="flex-1">
+            <Text className="text-3xl font-bold" style={{ color: colors.foreground }}>
+              {getGreeting()}
+            </Text>
+            <View className="flex-row items-center mt-1 gap-2">
             <Text className="text-base" style={{ color: colors.muted }}>
               {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
             </Text>
@@ -232,6 +235,20 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
+          
+          <TouchableOpacity 
+            onPress={() => router.push("/(tabs)/profile")}
+            className="w-10 h-10 rounded-full items-center justify-center overflow-hidden"
+            style={{ backgroundColor: colors.primary + '20' }}
+          >
+            {user?.name ? (
+              <Text className="font-bold text-lg" style={{ color: colors.primary }}>
+                {user.name.charAt(0).toUpperCase()}
+              </Text>
+            ) : (
+              <IconSymbol name="person.fill" size={20} color={colors.primary} />
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* ═══ Sales Goal Tracker ═══ */}

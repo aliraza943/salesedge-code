@@ -8,9 +8,10 @@ import CalendarPage from './pages/CalendarPage';
 import BrokersPage from './pages/BrokersPage';
 import SalesPage from './pages/SalesPage';
 import ChatPage from './pages/ChatPage';
+import ProfilePage from './pages/ProfilePage';
 
 export default function App() {
-  const { isAuthenticated, loading, user, login, logout } = useAuth();
+  const { isAuthenticated, loading, user, logout } = useAuth();
 
   if (loading) {
     return (
@@ -39,7 +40,7 @@ export default function App() {
   }
 
   if (!isAuthenticated) {
-    return <LoginPage onLogin={login} />;
+    return <LoginPage />;
   }
 
   return (
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/brokers" element={<BrokersPage />} />
         <Route path="/sales" element={<SalesPage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

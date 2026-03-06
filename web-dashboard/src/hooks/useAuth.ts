@@ -24,11 +24,11 @@ export function useAuth() {
 
   const checkAuth = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      const res = await fetch('/api/trpc/auth.me', { credentials: 'include' });
       if (res.ok) {
         const data = await res.json();
-        if (data.user) {
-          setState({ user: data.user, isAuthenticated: true, loading: false });
+        if (data.result?.data) {
+          setState({ user: data.result.data, isAuthenticated: true, loading: false });
           return;
         }
       }
@@ -42,24 +42,54 @@ export function useAuth() {
     checkAuth();
   }, [checkAuth]);
 
-  const login = useCallback(() => {
-    // Build the OAuth login URL
-    const appId = import.meta.env.VITE_APP_ID || '';
-    const portalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL || 'https://manus.im';
-    const redirectUri = `${window.location.origin}/api/oauth/callback`;
-    const state = btoa(redirectUri);
-    const url = `${portalUrl}/app-auth?appId=${appId}&redirectUri=${encodeURIComponent(redirectUri)}&state=${state}&type=signIn`;
-    window.location.href = url;
+  const login = useCallback(async (email: string, password: string) => {
+    const res = await fetch('/api/trpc/auth.login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+      credentials: 'include'
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error?.message || 'Login failed');
+    }
+    
+    const data = await res.json();
+    if (data.result?.data?.success) {
+      setState({ user: data.result.data.user, isAuthenticated: true, loading: false });
+    }
+    return data.result?.data;
+  }, []);
+
+  const signup = useCallback(async (name: string, email: string, password: string) => {
+    const res = await fetch('/api/trpc/auth.signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, email, password }),
+      credentials: 'include'
+    });
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error?.message || 'Signup failed');
+    }
+    
+    const data = await res.json();
+    if (data.result?.data?.success) {
+      setState({ user: data.result.data.user, isAuthenticated: true, loading: false });
+    }
+    return data.result?.data;
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch('/api/trpc/auth.logout', { method: 'POST', credentials: 'include' });
     } catch {
       // ignore
     }
     setState({ user: null, isAuthenticated: false, loading: false });
   }, []);
 
-  return { ...state, login, logout, refetch: checkAuth };
+  return { ...state, login, signup, logout, refetch: checkAuth };
 }

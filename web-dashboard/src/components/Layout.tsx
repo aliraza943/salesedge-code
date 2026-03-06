@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, Link } from 'react-router-dom';
 import React from 'react';
 
 interface User {
@@ -88,12 +88,20 @@ export default function Layout({ user, onLogout, children }: LayoutProps) {
           padding: '16px',
           borderTop: '1px solid rgba(255,255,255,0.08)',
         }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            marginBottom: 12,
-          }}>
+          <Link 
+            to="/profile" 
+            style={{ 
+              textDecoration: 'none', 
+              display: 'flex',
+              alignItems: 'center',
+              gap: 10,
+              marginBottom: 12,
+              padding: '8px',
+              borderRadius: 'var(--radius)',
+              background: location.pathname === '/profile' ? 'var(--color-sidebar-active)' : 'transparent',
+              transition: 'background 0.2s'
+            }}
+          >
             <div style={{
               width: 36,
               height: 36,
@@ -116,6 +124,7 @@ export default function Layout({ user, onLogout, children }: LayoutProps) {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                margin: 0
               }}>{user?.name || 'User'}</p>
               <p style={{
                 color: 'var(--color-sidebar-text)',
@@ -124,9 +133,10 @@ export default function Layout({ user, onLogout, children }: LayoutProps) {
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
+                margin: 0
               }}>{user?.email || ''}</p>
             </div>
-          </div>
+          </Link>
           <button
             onClick={onLogout}
             style={{
@@ -139,6 +149,7 @@ export default function Layout({ user, onLogout, children }: LayoutProps) {
               fontWeight: 500,
               border: '1px solid rgba(255,255,255,0.08)',
               transition: 'all 0.15s ease',
+              cursor: 'pointer'
             }}
           >
             Sign Out
