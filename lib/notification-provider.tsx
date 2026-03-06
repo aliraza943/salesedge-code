@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
@@ -44,6 +44,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [reminders, setReminders] = useState<ReminderMap>({});
   const loadedRef = useRef(false);
+
+  // Use refs to avoid stale closures in callbacks without adding state to deps
+  const remindersRef = useRef(reminders);
+  remindersRef.current = reminders;
+  const permissionRef = useRef(permissionGranted);
+  permissionRef.current = permissionGranted;
 
   // Setup notification handler on mount
   useEffect(() => {
@@ -102,8 +108,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       reminderMinutes: number;
     }) => {
       const key = String(params.eventId);
-      // Cancel existing reminder for this event if any
-      const existing = reminders[key];
+      // Cancel existing reminder for this event if any (use ref for current value)
+      const existing = remindersRef.current[key];
       if (existing) {
         await cancelEventReminder(existing.notificationId);
       }
@@ -119,7 +125,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
 
       // Request permission if not granted
-      if (!permissionGranted) {
+      if (!permissionRef.current) {
         const granted = await requestNotificationPermissions();
         setPermissionGranted(granted);
         if (!granted) return;
@@ -136,13 +142,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }));
       }
     },
-    [reminders, permissionGranted]
+    []
   );
 
   const removeReminder = useCallback(
     async (eventId: string | number) => {
       const key = String(eventId);
-      const existing = reminders[key];
+      const existing = remindersRef.current[key];
       if (existing) {
         await cancelEventReminder(existing.notificationId);
         setReminders((prev) => {
@@ -152,26 +158,29 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         });
       }
     },
-    [reminders]
+    []
   );
 
   const getReminderMinutes = useCallback(
     (eventId: string | number) => {
-      return reminders[String(eventId)]?.reminderMinutes || 0;
+      return remindersRef.current[String(eventId)]?.reminderMinutes || 0;
     },
-    [reminders]
+    []
+  );
+
+  const contextValue = useMemo(
+    () => ({
+      permissionGranted,
+      requestPermission,
+      setReminder,
+      removeReminder,
+      getReminderMinutes,
+    }),
+    [permissionGranted, requestPermission, setReminder, removeReminder, getReminderMinutes]
   );
 
   return (
-    <NotificationContext.Provider
-      value={{
-        permissionGranted,
-        requestPermission,
-        setReminder,
-        removeReminder,
-        getReminderMinutes,
-      }}
-    >
+    <NotificationContext.Provider value={contextValue}>
       {children}
     </NotificationContext.Provider>
   );

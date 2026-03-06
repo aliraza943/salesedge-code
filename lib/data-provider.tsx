@@ -14,6 +14,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -295,6 +296,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     enabled: isCloudMode,
     refetchOnMount: true,
   });
+
+  // Store query refs so callbacks don't depend on query objects (which change every render)
+  const eventsQueryRef = useRef(eventsQuery);
+  eventsQueryRef.current = eventsQuery;
+  const rfpsQueryRef = useRef(rfpsQuery);
+  rfpsQueryRef.current = rfpsQuery;
+  const dealsQueryRef = useRef(dealsQuery);
+  dealsQueryRef.current = dealsQuery;
+  const brokersQueryRef = useRef(brokersQuery);
+  brokersQueryRef.current = brokersQuery;
+  const salesGoalQueryRef = useRef(salesGoalQuery);
+  salesGoalQueryRef.current = salesGoalQuery;
+  const chatHistoryQueryRef = useRef(chatHistoryQuery);
+  chatHistoryQueryRef.current = chatHistoryQuery;
 
   // ─── Load data from cloud or local ──────────────────
 
@@ -1001,7 +1016,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const syncLocalToCloud = useCallback(async () => {
     if (!isCloudRef.current) {
-      console.log("[DataProvider] syncLocalToCloud: not in cloud mode, skipping");
       return null;
     }
     setIsSyncing(true);
@@ -1029,18 +1043,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       const hasLocalData = localEvents.length > 0 || localRfps.length > 0 || localDeals.length > 0 || localBrokers.length > 0;
       if (!hasLocalData && !localSalesGoal) {
-        console.log("[DataProvider] syncLocalToCloud: no local data to sync");
         setIsSyncing(false);
         return null;
       }
-
-      console.log("[DataProvider] syncLocalToCloud: importing", {
-        events: localEvents.length,
-        rfps: localRfps.length,
-        deals: localDeals.length,
-        brokers: localBrokers.length,
-        hasSalesGoal: !!localSalesGoal,
-      });
 
       const result = await syncImportMut.mutateAsync({
         events: localEvents.map(e => ({
@@ -1083,8 +1088,6 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         salesGoal: localSalesGoal,
       });
 
-      console.log("[DataProvider] syncLocalToCloud result:", result);
-
       // After successful sync, clear local data to prevent duplicate imports
       await Promise.all([
         AsyncStorage.removeItem("ai_planner_events"),
@@ -1096,11 +1099,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
       // Refetch cloud data to get the imported items with proper IDs
       await Promise.all([
-        eventsQuery.refetch(),
-        rfpsQuery.refetch(),
-        dealsQuery.refetch(),
-        brokersQuery.refetch(),
-        salesGoalQuery.refetch(),
+        eventsQueryRef.current.refetch(),
+        rfpsQueryRef.current.refetch(),
+        dealsQueryRef.current.refetch(),
+        brokersQueryRef.current.refetch(),
+        salesGoalQueryRef.current.refetch(),
       ]);
 
       setIsSyncing(false);
@@ -1110,7 +1113,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setIsSyncing(false);
       return null;
     }
-  }, [syncImportMut, eventsQuery, rfpsQuery, dealsQuery, brokersQuery, salesGoalQuery]);
+  }, [syncImportMut]);
 
   // Auto-sync local data to cloud when user first logs in
   useEffect(() => {
@@ -1132,14 +1135,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const refreshAll = useCallback(async () => {
     if (isCloudRef.current) {
-      // Refetch all queries from the server
+      // Refetch all queries from the server using refs (stable identity)
       await Promise.all([
-        eventsQuery.refetch(),
-        rfpsQuery.refetch(),
-        dealsQuery.refetch(),
-        brokersQuery.refetch(),
-        salesGoalQuery.refetch(),
-        chatHistoryQuery.refetch(),
+        eventsQueryRef.current.refetch(),
+        rfpsQueryRef.current.refetch(),
+        dealsQueryRef.current.refetch(),
+        brokersQueryRef.current.refetch(),
+        salesGoalQueryRef.current.refetch(),
+        chatHistoryQueryRef.current.refetch(),
       ]);
     } else {
       // Local mode: reload from AsyncStorage
@@ -1162,18 +1165,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
           setSalesGoal({ ...DEFAULT_SALES_GOAL, ...JSON.parse(savedGoal) });
       } catch { }
     }
-  }, [
-    eventsQuery,
-    rfpsQuery,
-    dealsQuery,
-    brokersQuery,
-    salesGoalQuery,
-    chatHistoryQuery,
-  ]);
+  }, []);
 
   return (
     <DataContext.Provider
-      value={{
+      value={useMemo(() => ({
         events,
         rfps,
         deals,
@@ -1204,7 +1200,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         refreshAll,
         syncLocalToCloud,
         isSyncing,
-      }}
+      }), [
+        events, rfps, deals, chatMessages, brokers,
+        user?.id, isLoading, isCloudMode, salesGoal, isSyncing,
+        updateSalesGoal, createEvent, updateEvent, deleteEvent,
+        createRfp, updateRfp, deleteRfp, createDeal, updateDeal, deleteDeal,
+        addChatMessage, clearChat, createBroker, updateBroker, deleteBroker,
+        addBrokerNote, removeBrokerNote, getOrCreateBroker, refreshAll, syncLocalToCloud,
+      ])}
     >
       {children}
     </DataContext.Provider>

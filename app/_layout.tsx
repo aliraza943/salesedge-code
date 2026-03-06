@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -24,6 +25,11 @@ import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-run
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
 
+// Prevent the splash screen from auto-hiding before the app is ready
+SplashScreen.preventAutoHideAsync().catch(() => {
+  // Best-effort; on web or in dev this may not be available
+});
+
 export const unstable_settings = {
   anchor: "(tabs)",
 };
@@ -34,13 +40,27 @@ export default function RootLayout() {
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+  const [appReady, setAppReady] = useState(false);
 
   useEffect(() => {
     initManusRuntime();
     if (Platform.OS !== "web") {
       configureNotifications();
     }
+    // Mark app as ready after initial setup
+    setAppReady(true);
   }, []);
+
+  // Hide splash screen once the app is ready and layout has mounted
+  useEffect(() => {
+    if (appReady) {
+      // Small delay to ensure the first frame has rendered
+      const timer = setTimeout(() => {
+        SplashScreen.hideAsync().catch(() => {});
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [appReady]);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);

@@ -46,6 +46,20 @@ export default function ChatScreen() {
   const voiceTranscribe = trpc.voice.transcribe.useMutation();
   const publicChat = trpc.publicChat.send.useMutation();
 
+  // ─── Refs for stable sendMessage (avoids dependency loop) ───
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  const rfpsRef = useRef(rfps);
+  rfpsRef.current = rfps;
+  const dealsRef = useRef(deals);
+  dealsRef.current = deals;
+  const chatMessagesRef = useRef(chatMessages);
+  chatMessagesRef.current = chatMessages;
+  const brokersRef = useRef(brokers);
+  brokersRef.current = brokers;
+  const sendingRef = useRef(sending);
+  sendingRef.current = sending;
+
   // Request mic permission on mount
   useEffect(() => {
     (async () => {
@@ -119,11 +133,11 @@ export default function ChatScreen() {
     [createEvent, createRfp, createDeal]
   );
 
-  // ─── Send Message ───────────────────────────────────
+  // ─── Send Message (stable — uses refs for data context) ───
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim() || sending) return;
+      if (!text.trim() || sendingRef.current) return;
       const msg = text.trim();
       setInput("");
       setSending(true);
@@ -136,19 +150,26 @@ export default function ChatScreen() {
         const localDate = getLocalTodayStr();
         const timezone = getUserTimezone();
 
+        // Snapshot current data via refs (avoids stale closure AND avoids dependency churn)
+        const currentEvents = eventsRef.current;
+        const currentRfps = rfpsRef.current;
+        const currentDeals = dealsRef.current;
+        const currentBrokers = brokersRef.current;
+        const currentChatMessages = chatMessagesRef.current;
+
         // Send to AI with context (including brokers with their conversation notes)
         const result = await publicChat.mutateAsync({
           message: msg,
-          events: JSON.stringify(events.slice(0, 30)),
-          rfps: JSON.stringify(rfps.slice(0, 20)),
-          deals: JSON.stringify(deals.slice(0, 20)),
-          brokers: JSON.stringify(brokers.map(b => ({
+          events: JSON.stringify(currentEvents.slice(0, 30)),
+          rfps: JSON.stringify(currentRfps.slice(0, 20)),
+          deals: JSON.stringify(currentDeals.slice(0, 20)),
+          brokers: JSON.stringify(currentBrokers.map(b => ({
             name: b.name,
             company: b.company,
             notes: (b.notes || []).slice(-10).map(n => ({ content: n.content, createdAt: n.createdAt })),
           }))),
           chatHistory: JSON.stringify(
-            chatMessages.slice(-10).map((m) => ({ role: m.role, content: m.content }))
+            currentChatMessages.slice(-10).map((m) => ({ role: m.role, content: m.content }))
           ),
           localDate,
           timezone,
@@ -179,7 +200,7 @@ export default function ChatScreen() {
         setSending(false);
       }
     },
-    [sending, events, rfps, deals, chatMessages, brokers, addChatMessage, publicChat, executeActions, refreshAll]
+    [addChatMessage, publicChat, executeActions]
   );
 
   // ─── Voice Recording ────────────────────────────────
