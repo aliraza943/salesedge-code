@@ -20,7 +20,9 @@ import { useColors } from "@/hooks/use-colors";
 import { useData } from "@/lib/data-provider";
 import { trpc } from "@/lib/trpc";
 import type { LocalChatMessage } from "@/lib/local-store";
+import { AIConsentStore } from "@/lib/local-store";
 import { getLocalTodayStr, getUserTimezone } from "@/lib/timezone";
+import { AIConsentModal } from "@/components/AIConsentModal";
 
 export default function ChatScreen() {
   const colors = useColors();
@@ -35,6 +37,13 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
+  const [aiConsent, setAiConsent] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
+  // pendingAction tracks what to do after the user accepts consent
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const pendingActionRef = useRef<"send" | "record" | null>(null);
+  // Skip consent check when running the deferred action after user just accepted (avoids stale closure showing modal again)
+  const consentJustAcceptedRef = useRef(false);
   // Web-native MediaRecorder refs for web voice recording
   const webMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const webChunksRef = useRef<Blob[]>([]);
@@ -55,6 +64,16 @@ export default function ChatScreen() {
       if (status.granted) {
         await setAudioModeAsync({ playsInSilentMode: true, allowsRecording: true });
       }
+    })();
+  }, []);
+
+  // Load AI consent preference on mount (do NOT reset on launch — that was a bug)
+  useEffect(() => {
+    (async () => {
+      // await AIConsentStore.reset()
+      const consent = await AIConsentStore.hasConsent();
+      setAiConsent(consent);
+      setConsentChecked(true);
     })();
   }, []);
 
@@ -124,6 +143,19 @@ export default function ChatScreen() {
   const sendMessage = useCallback(
     async (text: string) => {
       if (!text.trim() || sending) return;
+
+      // ── Consent gate ──────────────────────────────────────────────────────
+      // Before sending any user data to the AI, ensure the user has explicitly
+      // agreed to the AI data sharing disclosure (Guideline 5.1.1(i) / 5.1.2(i)).
+      if (!aiConsent && !consentJustAcceptedRef.current) {
+        pendingActionRef.current = "send";
+        setInput(text); // keep the text so it sends after consent
+        setShowConsentModal(true);
+        return;
+      }
+      consentJustAcceptedRef.current = false;
+      // ──────────────────────────────────────────────────────────────────────
+
       const msg = text.trim();
       setInput("");
       setSending(true);
@@ -179,12 +211,20 @@ export default function ChatScreen() {
         setSending(false);
       }
     },
-    [sending, events, rfps, deals, chatMessages, brokers, addChatMessage, publicChat, executeActions, refreshAll]
+    [sending, aiConsent, events, rfps, deals, chatMessages, brokers, addChatMessage, publicChat, executeActions, refreshAll]
   );
 
   // ─── Voice Recording ────────────────────────────────
 
   const startRecording = useCallback(async () => {
+    // Check if user has consented to AI data sharing before recording
+    if (!aiConsent && !consentJustAcceptedRef.current) {
+      pendingActionRef.current = "record";
+      setShowConsentModal(true);
+      return;
+    }
+    consentJustAcceptedRef.current = false;
+
     if (Platform.OS === "web") {
       // Use native MediaRecorder API on web
       try {
@@ -217,7 +257,7 @@ export default function ChatScreen() {
       console.error("[Chat] Recording failed:", err);
       setIsRecording(false);
     }
-  }, [hasPermission, audioRecorder]);
+  }, [hasPermission, audioRecorder, aiConsent]);
 
   const stopRecording = useCallback(async () => {
     try {
@@ -319,11 +359,11 @@ export default function ChatScreen() {
               {item.actions.map((action, idx) => {
                 const label =
                   action.type === "create_event" ? "Event Created" :
-                  action.type === "create_rfp" ? "RFP Created" :
-                  action.type === "create_deal" ? "Deal Created" : action.type;
+                    action.type === "create_rfp" ? "RFP Created" :
+                      action.type === "create_deal" ? "Deal Created" : action.type;
                 const badgeColor =
                   action.type === "create_event" ? colors.primary :
-                  action.type === "create_rfp" ? colors.warning : colors.success;
+                    action.type === "create_rfp" ? colors.warning : colors.success;
                 return (
                   <View
                     key={idx}
@@ -333,7 +373,7 @@ export default function ChatScreen() {
                     <IconSymbol
                       name={
                         action.type === "create_event" ? "calendar" :
-                        action.type === "create_rfp" ? "doc.text.fill" : "chart.line.uptrend.xyaxis"
+                          action.type === "create_rfp" ? "doc.text.fill" : "chart.line.uptrend.xyaxis"
                       }
                       size={12}
                       color={badgeColor}
@@ -357,170 +397,195 @@ export default function ChatScreen() {
   };
 
   return (
-    <ScreenContainer edges={["top", "left", "right"]} className="flex-1">
-      {/* Header */}
-      <View className="flex-row items-center justify-between px-5 pb-3">
-        <View>
-          <Text className="text-2xl font-bold" style={{ color: colors.foreground }}>
-            AI Assistant
-          </Text>
-          <Text className="text-xs" style={{ color: colors.muted }}>
-            Tell me what's on your plate
-          </Text>
+    <>
+      {/* AI Data Sharing Consent Modal — shown before first AI use */}
+      <AIConsentModal
+        visible={showConsentModal}
+        onDecline={() => {
+          setShowConsentModal(false);
+          pendingActionRef.current = null;
+        }}
+        onAccept={async () => {
+          setShowConsentModal(false);
+          await AIConsentStore.setConsent(true);
+          setAiConsent(true);
+          consentJustAcceptedRef.current = true;
+
+          const action = pendingActionRef.current;
+          pendingActionRef.current = null;
+          // After consenting, execute whatever the user was trying to do (ref avoids stale closure showing modal again)
+          if (action === "send") {
+            setTimeout(() => sendMessage(input), 100);
+          } else if (action === "record") {
+            setTimeout(() => startRecording(), 100);
+          }
+        }}
+      />
+      <ScreenContainer edges={["top", "left", "right"]} className="flex-1">
+        {/* Header */}
+        <View className="flex-row items-center justify-between px-5 pb-3">
+          <View>
+            <Text className="text-2xl font-bold" style={{ color: colors.foreground }}>
+              AI Assistant
+            </Text>
+            <Text className="text-xs" style={{ color: colors.muted }}>
+              Tell me what's on your plate
+            </Text>
+          </View>
+          {chatMessages.length > 0 && (
+            <TouchableOpacity
+              onPress={() => { haptic(); handleClearChat(); }}
+              activeOpacity={0.6}
+            >
+              <IconSymbol name="trash.fill" size={20} color={colors.error} />
+            </TouchableOpacity>
+          )}
         </View>
-        {chatMessages.length > 0 && (
-          <TouchableOpacity
-            onPress={() => { haptic(); handleClearChat(); }}
-            activeOpacity={0.6}
-          >
-            <IconSymbol name="trash.fill" size={20} color={colors.error} />
-          </TouchableOpacity>
-        )}
-      </View>
 
-      {/* Messages */}
-      <KeyboardAvoidingView
-        className="flex-1"
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-      >
-        {chatMessages.length === 0 ? (
-          <View className="flex-1 items-center justify-center px-8">
-            <View
-              className="w-16 h-16 rounded-full items-center justify-center mb-4"
-              style={{ backgroundColor: colors.primary + "15" }}
-            >
-              <IconSymbol name="mic.fill" size={28} color={colors.primary} />
-            </View>
-            <Text className="text-xl font-bold text-center mb-2" style={{ color: colors.foreground }}>
-              Your AI Secretary
-            </Text>
-            <Text className="text-sm text-center leading-5" style={{ color: colors.muted }}>
-              Just tell me what you need — meetings, reminders, RFPs, deals. I'll handle the rest.
-            </Text>
-            <View className="mt-6 gap-2 w-full">
-              {[
-                "I have a meeting with John tomorrow at 3",
-                "Remind me to call Sarah on Friday",
-                "New RFP from Smith, 200 lives, July 1st",
-                "What's on my schedule this week?",
-              ].map((suggestion, i) => (
-                <Pressable
-                  key={i}
-                  onPress={() => { haptic(); sendMessage(suggestion); }}
-                  style={({ pressed }) => [
-                    styles.suggestion,
-                    { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
-                  ]}
-                >
-                  <Text className="text-sm" style={{ color: colors.foreground }}>
-                    "{suggestion}"
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <FlatList
-            ref={flatListRef}
-            data={chatMessages}
-            renderItem={renderMessage}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingVertical: 8 }}
-            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-          />
-        )}
-
-        {/* Typing indicator */}
-        {sending && (
-          <View className="px-4 py-2 items-start">
-            <View
-              className="flex-row items-center rounded-2xl px-4 py-3"
-              style={{ backgroundColor: colors.surface }}
-            >
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text className="text-sm ml-2" style={{ color: colors.muted }}>
-                Thinking...
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* Input Bar */}
-        <View
-          className="flex-row items-end px-4 py-3 border-t"
-          style={{
-            borderTopColor: colors.border,
-            backgroundColor: colors.background,
-            paddingBottom: Math.max(insets.bottom, 12),
-          }}
+        {/* Messages */}
+        <KeyboardAvoidingView
+          className="flex-1"
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
         >
-          {/* Voice Button */}
-          <Pressable
-            onPress={isRecording ? stopRecording : startRecording}
-            disabled={sending}
-            style={({ pressed }) => [
-              styles.voiceBtn,
-              {
-                backgroundColor: isRecording ? colors.error : colors.primary,
-                opacity: pressed ? 0.9 : sending ? 0.5 : 1,
-                transform: [{ scale: isRecording ? 1.1 : pressed ? 0.95 : 1 }],
-              },
-            ]}
-          >
-            <IconSymbol name={isRecording ? "stop.fill" : "mic.fill"} size={22} color="#FFFFFF" />
-          </Pressable>
-
-          {/* Recording indicator */}
-          {isRecording ? (
-            <View className="flex-1 mx-2 items-center justify-center" style={{ minHeight: 44 }}>
-              <View className="flex-row items-center">
-                <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors.error }} />
-                <Text className="text-sm font-medium" style={{ color: colors.error }}>
-                  Recording... Tap mic to stop
-                </Text>
+          {chatMessages.length === 0 ? (
+            <View className="flex-1 items-center justify-center px-8">
+              <View
+                className="w-16 h-16 rounded-full items-center justify-center mb-4"
+                style={{ backgroundColor: colors.primary + "15" }}
+              >
+                <IconSymbol name="mic.fill" size={28} color={colors.primary} />
+              </View>
+              <Text className="text-xl font-bold text-center mb-2" style={{ color: colors.foreground }}>
+                Your AI Secretary
+              </Text>
+              <Text className="text-sm text-center leading-5" style={{ color: colors.muted }}>
+                Just tell me what you need — meetings, reminders, RFPs, deals. I'll handle the rest.
+              </Text>
+              <View className="mt-6 gap-2 w-full">
+                {[
+                  "I have a meeting with John tomorrow at 3",
+                  "Remind me to call Sarah on Friday",
+                  "New RFP from Smith, 200 lives, July 1st",
+                  "What's on my schedule this week?",
+                ].map((suggestion, i) => (
+                  <Pressable
+                    key={i}
+                    onPress={() => { haptic(); sendMessage(suggestion); }}
+                    style={({ pressed }) => [
+                      styles.suggestion,
+                      { backgroundColor: colors.surface, borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Text className="text-sm" style={{ color: colors.foreground }}>
+                      "{suggestion}"
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
             </View>
           ) : (
-            <>
-              {/* Text Input */}
-              <View
-                className="flex-1 flex-row items-end mx-2 rounded-2xl px-4 py-2"
-                style={{ backgroundColor: colors.surface, minHeight: 44, maxHeight: 120 }}
-              >
-                <TextInput
-                  className="flex-1 text-[15px]"
-                  style={{ color: colors.foreground, maxHeight: 100, paddingVertical: 6 }}
-                  placeholder="Type a message..."
-                  placeholderTextColor={colors.muted}
-                  value={input}
-                  onChangeText={setInput}
-                  multiline
-                  returnKeyType="send"
-                  onSubmitEditing={() => sendMessage(input)}
-                  editable={!sending}
-                />
-              </View>
-
-              {/* Send Button */}
-              <TouchableOpacity
-                onPress={() => { haptic(); sendMessage(input); }}
-                disabled={!input.trim() || sending}
-                activeOpacity={0.8}
-                style={[
-                  styles.sendBtn,
-                  {
-                    backgroundColor: input.trim() ? colors.primary : colors.muted + "30",
-                  },
-                ]}
-              >
-                <IconSymbol name="paperplane.fill" size={18} color={input.trim() ? "#FFFFFF" : colors.muted} />
-              </TouchableOpacity>
-            </>
+            <FlatList
+              ref={flatListRef}
+              data={chatMessages}
+              renderItem={renderMessage}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingVertical: 8 }}
+              onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+            />
           )}
-        </View>
-      </KeyboardAvoidingView>
-    </ScreenContainer>
+
+          {/* Typing indicator */}
+          {sending && (
+            <View className="px-4 py-2 items-start">
+              <View
+                className="flex-row items-center rounded-2xl px-4 py-3"
+                style={{ backgroundColor: colors.surface }}
+              >
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text className="text-sm ml-2" style={{ color: colors.muted }}>
+                  Thinking...
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Input Bar */}
+          <View
+            className="flex-row items-end px-4 py-3 border-t"
+            style={{
+              borderTopColor: colors.border,
+              backgroundColor: colors.background,
+              paddingBottom: Math.max(insets.bottom, 12),
+            }}
+          >
+            {/* Voice Button */}
+            <Pressable
+              onPress={isRecording ? stopRecording : startRecording}
+              disabled={sending}
+              style={({ pressed }) => [
+                styles.voiceBtn,
+                {
+                  backgroundColor: isRecording ? colors.error : colors.primary,
+                  opacity: pressed ? 0.9 : sending ? 0.5 : 1,
+                  transform: [{ scale: isRecording ? 1.1 : pressed ? 0.95 : 1 }],
+                },
+              ]}
+            >
+              <IconSymbol name={isRecording ? "stop.fill" : "mic.fill"} size={22} color="#FFFFFF" />
+            </Pressable>
+
+            {/* Recording indicator */}
+            {isRecording ? (
+              <View className="flex-1 mx-2 items-center justify-center" style={{ minHeight: 44 }}>
+                <View className="flex-row items-center">
+                  <View className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors.error }} />
+                  <Text className="text-sm font-medium" style={{ color: colors.error }}>
+                    Recording... Tap mic to stop
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <>
+                {/* Text Input */}
+                <View
+                  className="flex-1 flex-row items-end mx-2 rounded-2xl px-4 py-2"
+                  style={{ backgroundColor: colors.surface, minHeight: 44, maxHeight: 120 }}
+                >
+                  <TextInput
+                    className="flex-1 text-[15px]"
+                    style={{ color: colors.foreground, maxHeight: 100, paddingVertical: 6 }}
+                    placeholder="Type a message..."
+                    placeholderTextColor={colors.muted}
+                    value={input}
+                    onChangeText={setInput}
+                    multiline
+                    returnKeyType="send"
+                    onSubmitEditing={() => sendMessage(input)}
+                    editable={!sending}
+                  />
+                </View>
+
+                {/* Send Button */}
+                <TouchableOpacity
+                  onPress={() => { haptic(); sendMessage(input); }}
+                  disabled={!input.trim() || sending}
+                  activeOpacity={0.8}
+                  style={[
+                    styles.sendBtn,
+                    {
+                      backgroundColor: input.trim() ? colors.primary : colors.muted + "30",
+                    },
+                  ]}
+                >
+                  <IconSymbol name="paperplane.fill" size={18} color={input.trim() ? "#FFFFFF" : colors.muted} />
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </ScreenContainer>
+    </>
   );
 }
 

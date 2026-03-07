@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import {
   FlatList,
   Text,
@@ -30,6 +30,8 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { useData } from "@/lib/data-provider";
 import type { LocalRfp } from "@/lib/local-store";
+import { AIConsentStore } from "@/lib/local-store";
+import { AIConsentModal } from "@/components/AIConsentModal";
 import { getApiBaseUrl } from "@/constants/oauth";
 import { parseLocalDate, formatDateMedium } from "@/lib/timezone";
 
@@ -229,10 +231,13 @@ function DatePicker({
 export default function RfpsScreen() {
   const colors = useColors();
   const { rfps, brokers, refreshAll, createRfp, updateRfp: updateRfpData, deleteRfp: deleteRfpData, salesGoal, updateSalesGoal, createEvent, getOrCreateBroker, updateBroker } = useData();
+
+  const [showConsentModal, setShowConsentModal] = useState(false);
+  const pendingVoiceTarget = useRef<"create" | "edit" | null>(null);
   const [detailRfp, setDetailRfp] = useState<LocalRfp | null>(null);
   const [editingRfp, setEditingRfp] = useState<LocalRfp | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-
+  const consentJustAcceptedRef = useRef(false);
   // Create form state
   const [formCase, setFormCase] = useState("");
   const [formBroker, setFormBroker] = useState("");
@@ -264,6 +269,8 @@ export default function RfpsScreen() {
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [voiceTarget, setVoiceTarget] = useState<"create" | "edit" | null>(null);
+  const [aiConsent, setAiConsent] = useState(false);
+  const [consentChecked, setConsentChecked] = useState(false);
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const recorderState = useAudioRecorderState(audioRecorder);
 
@@ -279,6 +286,17 @@ export default function RfpsScreen() {
       refreshAll();
     }, [refreshAll])
   );
+
+  // Load AI consent preference on mount
+  useEffect(() => {
+    (async () => {
+      // await AIConsentStore.reset()
+      const consent = await AIConsentStore.hasConsent();
+      console.log("[RFPs] Loaded consent from storage:", consent);
+      setAiConsent(consent);
+      setConsentChecked(true);
+    })();
+  }, []);
 
   // Group RFPs by stage
   const groupedRfps = useMemo(() => {
@@ -461,7 +479,19 @@ export default function RfpsScreen() {
   const webChunksRef = useRef<Blob[]>([]);
 
   // Voice recording
-  const startVoiceRecording = async (target: "create" | "edit") => {
+  const startVoiceRecording = async (target: "create" | "edit", consentAlreadyGranted = false) => {
+    // Check if user has consented to AI data sharing before recording
+    console.log("hellllo")
+    console.log("!aiConsent", !aiConsent)
+    console.log("hellllo", !consentJustAcceptedRef.current)
+
+    if (!aiConsent && !consentJustAcceptedRef.current) {
+      pendingVoiceTarget.current = target;
+      setShowCreate(false)
+      setShowConsentModal(true);
+      return;
+    }
+    consentJustAcceptedRef.current = false;
     try {
       setVoiceTarget(target);
 
@@ -856,317 +886,200 @@ export default function RfpsScreen() {
   };
 
   return (
-    <ScreenContainer className="flex-1">
-      {/* Header */}
-      <View style={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 0.5, borderColor: colors.border }}>
-        <View>
-          <Text style={{ fontSize: 24, fontWeight: "700", color: colors.foreground }}>RFP Tracker</Text>
-          <Text style={{ fontSize: 14, marginTop: 2, color: colors.muted }}>{rfps.length} total proposals</Text>
+    <>
+      {/* AI Data Sharing Consent Modal — shown before first voice AI use */}
+      <AIConsentModal
+        visible={showConsentModal}
+        onDecline={() => {
+          setShowConsentModal(false);
+          pendingVoiceTarget.current = null;
+        }}
+        onAccept={async () => {
+          await AIConsentStore.setConsent(true);
+          setAiConsent(true);
+          setShowConsentModal(false);
+          consentJustAcceptedRef.current = true;
+          const target = pendingVoiceTarget.current;
+          pendingVoiceTarget.current = null;
+          if (target) {
+            setTimeout(() => startVoiceRecording(target, true), 100);
+          }
+        }}
+      />
+      <ScreenContainer className="flex-1">
+        {/* Header */}
+        <View style={{ paddingHorizontal: 20, paddingBottom: 12, paddingTop: 8, flexDirection: "row", alignItems: "center", justifyContent: "space-between", borderBottomWidth: 0.5, borderColor: colors.border }}>
+          <View>
+            <Text style={{ fontSize: 24, fontWeight: "700", color: colors.foreground }}>RFP Tracker</Text>
+            <Text style={{ fontSize: 14, marginTop: 2, color: colors.muted }}>{rfps.length} total proposals</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => { setShowCreate(true); resetCreateForm(); }}
+            activeOpacity={0.7}
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+          >
+            <IconSymbol name="plus" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          onPress={() => { setShowCreate(true); resetCreateForm(); }}
-          activeOpacity={0.7}
-          style={[styles.addButton, { backgroundColor: colors.primary }]}
-        >
-          <IconSymbol name="plus" size={20} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
 
-      {/* RFP List grouped by stage */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
-        {STAGE_ORDER.map((status) => {
-          const items = groupedRfps[status];
-          if (items.length === 0 && status === "sold") {
+        {/* RFP List grouped by stage */}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+          {STAGE_ORDER.map((status) => {
+            const items = groupedRfps[status];
+            if (items.length === 0 && status === "sold") {
+              return (
+                <View key={status}>
+                  {renderSectionHeader(getStatusLabel(status), status, 0)}
+                  <View style={{ alignItems: "center", paddingVertical: 20, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, color: colors.muted }}>No sold RFPs yet</Text>
+                  </View>
+                </View>
+              );
+            }
+            if (items.length === 0) return null;
             return (
               <View key={status}>
-                {renderSectionHeader(getStatusLabel(status), status, 0)}
-                <View style={{ alignItems: "center", paddingVertical: 20, borderRadius: 12, borderWidth: 1, borderStyle: "dashed", borderColor: colors.border, marginBottom: 8 }}>
-                  <Text style={{ fontSize: 13, color: colors.muted }}>No sold RFPs yet</Text>
-                </View>
+                {renderSectionHeader(getStatusLabel(status), status, items.length)}
+                {items.map((item) => (
+                  <View key={item.id}>{renderRfpCard({ item })}</View>
+                ))}
               </View>
             );
-          }
-          if (items.length === 0) return null;
-          return (
-            <View key={status}>
-              {renderSectionHeader(getStatusLabel(status), status, items.length)}
-              {items.map((item) => (
-                <View key={item.id}>{renderRfpCard({ item })}</View>
-              ))}
-            </View>
-          );
-        })}
+          })}
 
-        {rfps.length === 0 && (
-          <View style={{ alignItems: "center", paddingVertical: 80 }}>
-            <IconSymbol name="doc.text.fill" size={48} color={colors.muted} />
-            <Text style={{ fontSize: 16, fontWeight: "500", marginTop: 12, color: colors.muted }}>No RFPs yet</Text>
-            <Text style={{ fontSize: 14, marginTop: 4, textAlign: "center", paddingHorizontal: 32, color: colors.muted }}>
-              Tap + to add your first RFP using voice
-            </Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* ===== CREATE MODAL — VOICE FIRST ===== */}
-      <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: colors.background }}>
-          {/* Header */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 0.5, borderColor: colors.border }}>
-            <TouchableOpacity onPress={() => { setShowCreate(false); resetCreateForm(); }} activeOpacity={0.6}>
-              <Text style={{ fontSize: 16, color: colors.muted }}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>New RFP</Text>
-            <TouchableOpacity onPress={handleCreate} activeOpacity={0.6}>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.primary }}>Save</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
-            {/* ===== LARGE VOICE INPUT AREA ===== */}
-            <View style={{ alignItems: "center", paddingTop: 20, paddingBottom: 24 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  if (isRecording) {
-                    stopVoiceRecording();
-                  } else {
-                    startVoiceRecording("create");
-                  }
-                }}
-                disabled={isTranscribing}
-                activeOpacity={0.7}
-                style={{
-                  width: 100,
-                  height: 100,
-                  borderRadius: 50,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  backgroundColor: isRecording ? colors.error : colors.primary,
-                  opacity: isTranscribing ? 0.5 : 1,
-                  shadowColor: isRecording ? colors.error : colors.primary,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.3,
-                  shadowRadius: 8,
-                  elevation: 6,
-                }}
-              >
-                {isTranscribing ? (
-                  <ActivityIndicator size="large" color="#FFFFFF" />
-                ) : isRecording ? (
-                  <IconSymbol name="stop.fill" size={36} color="#FFFFFF" />
-                ) : (
-                  <IconSymbol name="mic.fill" size={36} color="#FFFFFF" />
-                )}
-              </TouchableOpacity>
-
-              <Text style={{ fontSize: 17, fontWeight: "600", marginTop: 16, color: colors.foreground }}>
-                {isTranscribing ? "Processing..." : isRecording ? "Listening... Tap to stop" : "Tap to Dictate RFP"}
+          {rfps.length === 0 && (
+            <View style={{ alignItems: "center", paddingVertical: 80 }}>
+              <IconSymbol name="doc.text.fill" size={48} color={colors.muted} />
+              <Text style={{ fontSize: 16, fontWeight: "500", marginTop: 12, color: colors.muted }}>No RFPs yet</Text>
+              <Text style={{ fontSize: 14, marginTop: 4, textAlign: "center", paddingHorizontal: 32, color: colors.muted }}>
+                Tap + to add your first RFP using voice
               </Text>
-
-              {!isTranscribing && (
-                <View style={{ marginTop: 16, width: "100%", paddingHorizontal: 8 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 10, textAlign: "center" }}>
-                    {isRecording ? "Say each field:" : "Say all fields in one go:"}
-                  </Text>
-                  <View style={{ borderRadius: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: isRecording ? colors.error + "40" : colors.border, overflow: "hidden" }}>
-                    {[
-                      { label: "Case", example: "ABC Corporation", icon: "doc.text.fill" as const },
-                      { label: "Brokerage", example: "Smith & Associates", icon: "person.fill" as const },
-                      { label: "Brokerage Contact", example: "John Smith", icon: "person.2.fill" as const },
-                      { label: "Lives", example: "250", icon: "person.2.fill" as const },
-                      { label: "Effective Date", example: "March 1st", icon: "calendar" as const },
-                      { label: "Premium", example: "150 thousand", icon: "dollarsign.circle.fill" as const },
-                      { label: "Follow Up", example: "next Tuesday", icon: "bell.fill" as const },
-                      { label: "Notes", example: "any details", icon: "pencil" as const },
-                    ].map((field, idx) => (
-                      <View
-                        key={field.label}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingHorizontal: 14,
-                          paddingVertical: 10,
-                          borderBottomWidth: idx < 7 ? 0.5 : 0,
-                          borderColor: colors.border,
-                          gap: 10,
-                        }}
-                      >
-                        <IconSymbol name={field.icon} size={16} color={isRecording ? colors.error : colors.primary} />
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, width: 110 }}>{field.label}</Text>
-                        <Text style={{ fontSize: 13, color: colors.muted, flex: 1, fontStyle: "italic" }}>"{field.example}"</Text>
-                      </View>
-                    ))}
-                  </View>
-                  {isRecording && (
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
-                      <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.error }} />
-                      <Text style={{ fontSize: 14, color: colors.error, fontWeight: "500" }}>Recording...</Text>
-                    </View>
-                  )}
-                </View>
-              )}
             </View>
+          )}
+        </ScrollView>
 
-            {/* Divider */}
-            <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 20 }} />
-
-            {/* Parsed preview (shows after voice fills fields) */}
-            {renderParsedPreview()}
-
-            {/* Editable fields — always visible so user can manually enter/edit any field */}
-            <View>
-              {renderFormField("Case *", formCase, setFormCase, "e.g., ABC Corporation Group Benefits")}
-              {renderFormField("Brokerage *", formBroker, setFormBroker, "e.g., Smith & Associates")}
-              {renderContactField("Brokerage Contact", formBrokerContact, setFormBrokerContact, "e.g., John Smith", showContactSuggestions, setShowContactSuggestions)}
-              {renderFormField("Lives", formLives, setFormLives, "e.g., 250", { keyboardType: "numeric" })}
-              {renderDateField("Effective Date", formEffectiveDate, setFormEffectiveDate, showCreateDatePicker, setShowCreateDatePicker)}
-              {renderFormField("Premium ($)", formPremium, setFormPremium, "e.g., 150000", { keyboardType: "numeric" })}
-              {renderDateField("Follow-Up Date", formFollowUpDate, setFormFollowUpDate, showCreateFollowUpPicker, setShowCreateFollowUpPicker)}
-              {renderFormField("Notes", formNotes, setFormNotes, "Any additional notes or details...", { multiline: true })}
-            </View>
-
-            {/* Re-record button */}
-            {(formCase || formBroker) && !isRecording && !isTranscribing && (
-              <TouchableOpacity
-                onPress={() => startVoiceRecording("create")}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  paddingVertical: 14,
-                  borderRadius: 12,
-                  backgroundColor: colors.primary + "10",
-                  borderWidth: 1,
-                  borderColor: colors.primary + "30",
-                  marginTop: 8,
-                }}
-              >
-                <IconSymbol name="mic.fill" size={18} color={colors.primary} />
-                <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Re-dictate</Text>
-              </TouchableOpacity>
-            )}
-
-            <View style={{ height: 40 }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ===== DETAIL MODAL ===== */}
-      <Modal visible={!!detailRfp} animationType="slide" presentationStyle="pageSheet">
-        {detailRfp && (
-          <View style={{ flex: 1, backgroundColor: colors.background }}>
+        {/* ===== CREATE MODAL — VOICE FIRST ===== */}
+        <Modal visible={showCreate} animationType="slide" presentationStyle="pageSheet">
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: colors.background }}>
+            {/* Header */}
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 0.5, borderColor: colors.border }}>
-              <TouchableOpacity onPress={() => setDetailRfp(null)} activeOpacity={0.6}>
-                <Text style={{ fontSize: 16, color: colors.primary }}>Close</Text>
+              <TouchableOpacity onPress={() => { setShowCreate(false); resetCreateForm(); }} activeOpacity={0.6}>
+                <Text style={{ fontSize: 16, color: colors.muted }}>Cancel</Text>
               </TouchableOpacity>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>RFP Details</Text>
-              <View style={{ flexDirection: "row", gap: 16 }}>
-                <TouchableOpacity onPress={() => openEdit(detailRfp)} activeOpacity={0.6}>
-                  <Text style={{ fontSize: 16, color: colors.primary }}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(detailRfp)} activeOpacity={0.6}>
-                  <Text style={{ fontSize: 16, color: colors.error }}>Delete</Text>
-                </TouchableOpacity>
-              </View>
+              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>New RFP</Text>
+              <TouchableOpacity onPress={handleCreate} activeOpacity={0.6}>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: colors.primary }}>Save</Text>
+              </TouchableOpacity>
             </View>
-            <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }}>
-              <Text style={{ fontSize: 24, fontWeight: "700", marginBottom: 4, color: colors.foreground }}>{detailRfp.title}</Text>
 
-              <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
-                <View style={{ borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: getStatusColor(detailRfp.status, colors) + "20" }}>
-                  <Text style={{ fontSize: 14, fontWeight: "500", color: getStatusColor(detailRfp.status, colors) }}>
-                    {getStatusLabel(detailRfp.status)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border }}>
-                <DetailRow label="Brokerage" value={detailRfp.client} colors={colors} />
-                <DetailRow label="Brokerage Contact" value={detailRfp.brokerContact || "—"} colors={colors} />
-                <DetailRow label="Lives" value={detailRfp.lives != null ? String(detailRfp.lives) : "—"} colors={colors} />
-                <DetailRow label="Effective Date" value={formatDate(detailRfp.effectiveDate)} colors={colors} />
-                <DetailRow label="Premium" value={formatCurrency(detailRfp.premium)} colors={colors} last />
-              </View>
-
-              {/* Follow-Up Date */}
-              <View style={{ marginBottom: 16 }}>
-                <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>Follow-Up</Text>
-                {detailRfp.followUpDate ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: colors.primary + "10", borderColor: colors.primary + "30", flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
-                      <IconSymbol name="calendar" size={18} color={colors.primary} />
-                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>{formatDate(detailRfp.followUpDate)}</Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => setShowDetailFollowUpPicker(true)}
-                      activeOpacity={0.6}
-                      style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
-                    >
-                      <Text style={{ fontSize: 13, color: colors.primary }}>Change</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={() => setShowDetailFollowUpPicker(true)}
-                    activeOpacity={0.6}
-                    style={{
-                      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-                      paddingVertical: 12, borderRadius: 12,
-                      backgroundColor: colors.primary + "10", borderWidth: 1, borderColor: colors.primary + "30",
-                    }}
-                  >
-                    <IconSymbol name="calendar" size={18} color={colors.primary} />
-                    <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Set Follow-Up Date</Text>
-                  </TouchableOpacity>
-                )}
-                {showDetailFollowUpPicker && (
-                  <View style={{ marginTop: 8 }}>
-                    <DatePicker
-                      value={detailRfp.followUpDate || ""}
-                      onChange={async (date) => {
-                        await updateRfpData(detailRfp.id, { followUpDate: date || undefined });
-                        if (date) {
-                          await createEvent({
-                            title: `Follow up: ${detailRfp.title}`,
-                            description: `RFP follow-up for case: ${detailRfp.title} | Brokerage: ${detailRfp.client}`,
-                            date,
-                            startTime: "09:00",
-                            reminderMinutes: 15,
-                            sourceType: "follow-up",
-                            sourceRfpId: detailRfp.id,
-                          });
-                          if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                        }
-                        await refreshAll();
-                        // Update detail view with new data
-                        setDetailRfp({ ...detailRfp, followUpDate: date || undefined });
-                        setShowDetailFollowUpPicker(false);
-                      }}
-                      colors={colors}
-                      onClose={() => setShowDetailFollowUpPicker(false)}
-                    />
-                  </View>
-                )}
-              </View>
-
-              {detailRfp.notes && (
-                <View style={{ marginBottom: 16 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>Notes</Text>
-                  <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 15, lineHeight: 22, color: colors.foreground }}>{detailRfp.notes}</Text>
-                  </View>
-                </View>
-              )}
-
-              {getNextStage(detailRfp.status) && (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+              {/* ===== LARGE VOICE INPUT AREA ===== */}
+              <View style={{ alignItems: "center", paddingTop: 20, paddingBottom: 24 }}>
                 <TouchableOpacity
                   onPress={() => {
-                    handleMoveToNextStage(detailRfp);
-                    setDetailRfp(null);
+                    if (isRecording) {
+                      stopVoiceRecording();
+                    } else {
+                      startVoiceRecording("create");
+                    }
                   }}
-                  activeOpacity={0.6}
+                  disabled={isTranscribing}
+                  activeOpacity={0.7}
+                  style={{
+                    width: 100,
+                    height: 100,
+                    borderRadius: 50,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: isRecording ? colors.error : colors.primary,
+                    opacity: isTranscribing ? 0.5 : 1,
+                    shadowColor: isRecording ? colors.error : colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 6,
+                  }}
+                >
+                  {isTranscribing ? (
+                    <ActivityIndicator size="large" color="#FFFFFF" />
+                  ) : isRecording ? (
+                    <IconSymbol name="stop.fill" size={36} color="#FFFFFF" />
+                  ) : (
+                    <IconSymbol name="mic.fill" size={36} color="#FFFFFF" />
+                  )}
+                </TouchableOpacity>
+
+                <Text style={{ fontSize: 17, fontWeight: "600", marginTop: 16, color: colors.foreground }}>
+                  {isTranscribing ? "Processing..." : isRecording ? "Listening... Tap to stop" : "Tap to Dictate RFP"}
+                </Text>
+
+                {!isTranscribing && (
+                  <View style={{ marginTop: 16, width: "100%", paddingHorizontal: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 10, textAlign: "center" }}>
+                      {isRecording ? "Say each field:" : "Say all fields in one go:"}
+                    </Text>
+                    <View style={{ borderRadius: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: isRecording ? colors.error + "40" : colors.border, overflow: "hidden" }}>
+                      {[
+                        { label: "Case", example: "ABC Corporation", icon: "doc.text.fill" as const },
+                        { label: "Brokerage", example: "Smith & Associates", icon: "person.fill" as const },
+                        { label: "Brokerage Contact", example: "John Smith", icon: "person.2.fill" as const },
+                        { label: "Lives", example: "250", icon: "person.2.fill" as const },
+                        { label: "Effective Date", example: "March 1st", icon: "calendar" as const },
+                        { label: "Premium", example: "150 thousand", icon: "dollarsign.circle.fill" as const },
+                        { label: "Follow Up", example: "next Tuesday", icon: "bell.fill" as const },
+                        { label: "Notes", example: "any details", icon: "pencil" as const },
+                      ].map((field, idx) => (
+                        <View
+                          key={field.label}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            borderBottomWidth: idx < 7 ? 0.5 : 0,
+                            borderColor: colors.border,
+                            gap: 10,
+                          }}
+                        >
+                          <IconSymbol name={field.icon} size={16} color={isRecording ? colors.error : colors.primary} />
+                          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, width: 110 }}>{field.label}</Text>
+                          <Text style={{ fontSize: 13, color: colors.muted, flex: 1, fontStyle: "italic" }}>"{field.example}"</Text>
+                        </View>
+                      ))}
+                    </View>
+                    {isRecording && (
+                      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 12 }}>
+                        <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.error }} />
+                        <Text style={{ fontSize: 14, color: colors.error, fontWeight: "500" }}>Recording...</Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
+
+              {/* Divider */}
+              <View style={{ height: 1, backgroundColor: colors.border, marginBottom: 20 }} />
+
+              {/* Parsed preview (shows after voice fills fields) */}
+              {renderParsedPreview()}
+
+              {/* Editable fields — always visible so user can manually enter/edit any field */}
+              <View>
+                {renderFormField("Case *", formCase, setFormCase, "e.g., ABC Corporation Group Benefits")}
+                {renderFormField("Brokerage *", formBroker, setFormBroker, "e.g., Smith & Associates")}
+                {renderContactField("Brokerage Contact", formBrokerContact, setFormBrokerContact, "e.g., John Smith", showContactSuggestions, setShowContactSuggestions)}
+                {renderFormField("Lives", formLives, setFormLives, "e.g., 250", { keyboardType: "numeric" })}
+                {renderDateField("Effective Date", formEffectiveDate, setFormEffectiveDate, showCreateDatePicker, setShowCreateDatePicker)}
+                {renderFormField("Premium ($)", formPremium, setFormPremium, "e.g., 150000", { keyboardType: "numeric" })}
+                {renderDateField("Follow-Up Date", formFollowUpDate, setFormFollowUpDate, showCreateFollowUpPicker, setShowCreateFollowUpPicker)}
+                {renderFormField("Notes", formNotes, setFormNotes, "Any additional notes or details...", { multiline: true })}
+              </View>
+
+              {/* Re-record button */}
+              {(formCase || formBroker) && !isRecording && !isTranscribing && (
+                <TouchableOpacity
+                  onPress={() => startVoiceRecording("create")}
+                  activeOpacity={0.7}
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
@@ -1174,117 +1087,255 @@ export default function RfpsScreen() {
                     gap: 8,
                     paddingVertical: 14,
                     borderRadius: 12,
-                    marginBottom: 16,
-                    backgroundColor: getStatusColor(getNextStage(detailRfp.status)!, colors) + "15",
+                    backgroundColor: colors.primary + "10",
                     borderWidth: 1,
-                    borderColor: getStatusColor(getNextStage(detailRfp.status)!, colors) + "40",
+                    borderColor: colors.primary + "30",
+                    marginTop: 8,
                   }}
                 >
-                  <IconSymbol name="arrow.up" size={18} color={getStatusColor(getNextStage(detailRfp.status)!, colors)} />
-                  <Text style={{ fontSize: 16, fontWeight: "600", color: getStatusColor(getNextStage(detailRfp.status)!, colors) }}>
-                    Move to {getStatusLabel(getNextStage(detailRfp.status)!)}
-                  </Text>
+                  <IconSymbol name="mic.fill" size={18} color={colors.primary} />
+                  <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Re-dictate</Text>
                 </TouchableOpacity>
               )}
-            </ScrollView>
-          </View>
-        )}
-      </Modal>
 
-      {/* ===== EDIT MODAL — VOICE + FIELDS ===== */}
-      <Modal visible={!!editingRfp} animationType="slide" presentationStyle="pageSheet">
-        {editingRfp && (
-          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: colors.background }}>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 0.5, borderColor: colors.border }}>
-              <TouchableOpacity onPress={() => setEditingRfp(null)} activeOpacity={0.6}>
-                <Text style={{ fontSize: 16, color: colors.muted }}>Cancel</Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>Edit RFP</Text>
-              <TouchableOpacity onPress={handleUpdate} activeOpacity={0.6}>
-                <Text style={{ fontSize: 16, fontWeight: "600", color: colors.primary }}>Save</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
-              {/* Voice re-dictate button for edit */}
-              <TouchableOpacity
-                onPress={() => {
-                  if (isRecording) {
-                    stopVoiceRecording();
-                  } else {
-                    startVoiceRecording("edit");
-                  }
-                }}
-                disabled={isTranscribing}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  paddingVertical: 14,
-                  borderRadius: 12,
-                  marginBottom: 20,
-                  backgroundColor: isRecording ? colors.error + "15" : colors.primary + "10",
-                  borderWidth: 1,
-                  borderColor: isRecording ? colors.error : colors.primary + "30",
-                  opacity: isTranscribing ? 0.5 : 1,
-                }}
-              >
-                {isTranscribing ? (
-                  <>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Processing voice...</Text>
-                  </>
-                ) : isRecording ? (
-                  <>
-                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.error }} />
-                    <Text style={{ fontSize: 15, fontWeight: "500", color: colors.error }}>Tap to stop recording</Text>
-                  </>
-                ) : (
-                  <>
-                    <IconSymbol name="mic.fill" size={20} color={colors.primary} />
-                    <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Re-dictate with Voice</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-
-              {/* Status selector */}
-              <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>Status</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
-                {STAGE_ORDER.map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    onPress={() => setEditStatus(opt)}
-                    activeOpacity={0.6}
-                    style={[
-                      styles.filterChip,
-                      {
-                        backgroundColor: editStatus === opt ? getStatusColor(opt, colors) + "20" : colors.surface,
-                        borderColor: editStatus === opt ? getStatusColor(opt, colors) : colors.border,
-                      },
-                    ]}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: "500", color: editStatus === opt ? getStatusColor(opt, colors) : colors.foreground }}>
-                      {getStatusLabel(opt)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {renderFormField("Case", editCase, setEditCase, "Case name")}
-              {renderFormField("Brokerage", editBroker, setEditBroker, "Brokerage name")}
-              {renderContactField("Brokerage Contact", editBrokerContact, setEditBrokerContact, "Contact person", showEditContactSuggestions, setShowEditContactSuggestions)}
-              {renderFormField("Lives", editLives, setEditLives, "Number of lives", { keyboardType: "numeric" })}
-              {renderDateField("Effective Date", editEffectiveDate, setEditEffectiveDate, showEditDatePicker, setShowEditDatePicker)}
-              {renderFormField("Premium ($)", editPremium, setEditPremium, "Premium amount", { keyboardType: "numeric" })}
-              {renderDateField("Follow-Up Date", editFollowUpDate, setEditFollowUpDate, showEditFollowUpPicker, setShowEditFollowUpPicker)}
-              {renderFormField("Notes", editNotes, setEditNotes, "Notes...", { multiline: true })}
               <View style={{ height: 40 }} />
             </ScrollView>
           </KeyboardAvoidingView>
-        )}
-      </Modal>
-    </ScreenContainer>
+        </Modal>
+
+        {/* ===== DETAIL MODAL ===== */}
+        <Modal visible={!!detailRfp} animationType="slide" presentationStyle="pageSheet">
+          {detailRfp && (
+            <View style={{ flex: 1, backgroundColor: colors.background }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 0.5, borderColor: colors.border }}>
+                <TouchableOpacity onPress={() => setDetailRfp(null)} activeOpacity={0.6}>
+                  <Text style={{ fontSize: 16, color: colors.primary }}>Close</Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>RFP Details</Text>
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  <TouchableOpacity onPress={() => openEdit(detailRfp)} activeOpacity={0.6}>
+                    <Text style={{ fontSize: 16, color: colors.primary }}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(detailRfp)} activeOpacity={0.6}>
+                    <Text style={{ fontSize: 16, color: colors.error }}>Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }}>
+                <Text style={{ fontSize: 24, fontWeight: "700", marginBottom: 4, color: colors.foreground }}>{detailRfp.title}</Text>
+
+                <View style={{ flexDirection: "row", gap: 12, marginBottom: 16 }}>
+                  <View style={{ borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: getStatusColor(detailRfp.status, colors) + "20" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "500", color: getStatusColor(detailRfp.status, colors) }}>
+                      {getStatusLabel(detailRfp.status)}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border }}>
+                  <DetailRow label="Brokerage" value={detailRfp.client} colors={colors} />
+                  <DetailRow label="Brokerage Contact" value={detailRfp.brokerContact || "—"} colors={colors} />
+                  <DetailRow label="Lives" value={detailRfp.lives != null ? String(detailRfp.lives) : "—"} colors={colors} />
+                  <DetailRow label="Effective Date" value={formatDate(detailRfp.effectiveDate)} colors={colors} />
+                  <DetailRow label="Premium" value={formatCurrency(detailRfp.premium)} colors={colors} last />
+                </View>
+
+                {/* Follow-Up Date */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>Follow-Up</Text>
+                  {detailRfp.followUpDate ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                      <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: colors.primary + "10", borderColor: colors.primary + "30", flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                        <IconSymbol name="calendar" size={18} color={colors.primary} />
+                        <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>{formatDate(detailRfp.followUpDate)}</Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => setShowDetailFollowUpPicker(true)}
+                        activeOpacity={0.6}
+                        style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }}
+                      >
+                        <Text style={{ fontSize: 13, color: colors.primary }}>Change</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => setShowDetailFollowUpPicker(true)}
+                      activeOpacity={0.6}
+                      style={{
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+                        paddingVertical: 12, borderRadius: 12,
+                        backgroundColor: colors.primary + "10", borderWidth: 1, borderColor: colors.primary + "30",
+                      }}
+                    >
+                      <IconSymbol name="calendar" size={18} color={colors.primary} />
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Set Follow-Up Date</Text>
+                    </TouchableOpacity>
+                  )}
+                  {showDetailFollowUpPicker && (
+                    <View style={{ marginTop: 8 }}>
+                      <DatePicker
+                        value={detailRfp.followUpDate || ""}
+                        onChange={async (date) => {
+                          await updateRfpData(detailRfp.id, { followUpDate: date || undefined });
+                          if (date) {
+                            await createEvent({
+                              title: `Follow up: ${detailRfp.title}`,
+                              description: `RFP follow-up for case: ${detailRfp.title} | Brokerage: ${detailRfp.client}`,
+                              date,
+                              startTime: "09:00",
+                              reminderMinutes: 15,
+                              sourceType: "follow-up",
+                              sourceRfpId: detailRfp.id,
+                            });
+                            if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                          }
+                          await refreshAll();
+                          // Update detail view with new data
+                          setDetailRfp({ ...detailRfp, followUpDate: date || undefined });
+                          setShowDetailFollowUpPicker(false);
+                        }}
+                        colors={colors}
+                        onClose={() => setShowDetailFollowUpPicker(false)}
+                      />
+                    </View>
+                  )}
+                </View>
+
+                {detailRfp.notes && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>Notes</Text>
+                    <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border }}>
+                      <Text style={{ fontSize: 15, lineHeight: 22, color: colors.foreground }}>{detailRfp.notes}</Text>
+                    </View>
+                  </View>
+                )}
+
+                {getNextStage(detailRfp.status) && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      handleMoveToNextStage(detailRfp);
+                      setDetailRfp(null);
+                    }}
+                    activeOpacity={0.6}
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 8,
+                      paddingVertical: 14,
+                      borderRadius: 12,
+                      marginBottom: 16,
+                      backgroundColor: getStatusColor(getNextStage(detailRfp.status)!, colors) + "15",
+                      borderWidth: 1,
+                      borderColor: getStatusColor(getNextStage(detailRfp.status)!, colors) + "40",
+                    }}
+                  >
+                    <IconSymbol name="arrow.up" size={18} color={getStatusColor(getNextStage(detailRfp.status)!, colors)} />
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: getStatusColor(getNextStage(detailRfp.status)!, colors) }}>
+                      Move to {getStatusLabel(getNextStage(detailRfp.status)!)}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </ScrollView>
+            </View>
+          )}
+        </Modal>
+
+        {/* ===== EDIT MODAL — VOICE + FIELDS ===== */}
+        <Modal visible={!!editingRfp} animationType="slide" presentationStyle="pageSheet">
+          {editingRfp && (
+            <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: colors.background }}>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 0.5, borderColor: colors.border }}>
+                <TouchableOpacity onPress={() => setEditingRfp(null)} activeOpacity={0.6}>
+                  <Text style={{ fontSize: 16, color: colors.muted }}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: colors.foreground }}>Edit RFP</Text>
+                <TouchableOpacity onPress={handleUpdate} activeOpacity={0.6}>
+                  <Text style={{ fontSize: 16, fontWeight: "600", color: colors.primary }}>Save</Text>
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }} keyboardShouldPersistTaps="handled">
+                {/* Voice re-dictate button for edit */}
+                <TouchableOpacity
+                  onPress={() => {
+                    if (isRecording) {
+                      stopVoiceRecording();
+                    } else {
+                      startVoiceRecording("edit");
+                    }
+                  }}
+                  disabled={isTranscribing}
+                  activeOpacity={0.7}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 8,
+                    paddingVertical: 14,
+                    borderRadius: 12,
+                    marginBottom: 20,
+                    backgroundColor: isRecording ? colors.error + "15" : colors.primary + "10",
+                    borderWidth: 1,
+                    borderColor: isRecording ? colors.error : colors.primary + "30",
+                    opacity: isTranscribing ? 0.5 : 1,
+                  }}
+                >
+                  {isTranscribing ? (
+                    <>
+                      <ActivityIndicator size="small" color={colors.primary} />
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Processing voice...</Text>
+                    </>
+                  ) : isRecording ? (
+                    <>
+                      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.error }} />
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.error }}>Tap to stop recording</Text>
+                    </>
+                  ) : (
+                    <>
+                      <IconSymbol name="mic.fill" size={20} color={colors.primary} />
+                      <Text style={{ fontSize: 15, fontWeight: "500", color: colors.primary }}>Re-dictate with Voice</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Status selector */}
+                <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 6 }}>Status</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginBottom: 16 }}>
+                  {STAGE_ORDER.map((opt) => (
+                    <TouchableOpacity
+                      key={opt}
+                      onPress={() => setEditStatus(opt)}
+                      activeOpacity={0.6}
+                      style={[
+                        styles.filterChip,
+                        {
+                          backgroundColor: editStatus === opt ? getStatusColor(opt, colors) + "20" : colors.surface,
+                          borderColor: editStatus === opt ? getStatusColor(opt, colors) : colors.border,
+                        },
+                      ]}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: "500", color: editStatus === opt ? getStatusColor(opt, colors) : colors.foreground }}>
+                        {getStatusLabel(opt)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+
+                {renderFormField("Case", editCase, setEditCase, "Case name")}
+                {renderFormField("Brokerage", editBroker, setEditBroker, "Brokerage name")}
+                {renderContactField("Brokerage Contact", editBrokerContact, setEditBrokerContact, "Contact person", showEditContactSuggestions, setShowEditContactSuggestions)}
+                {renderFormField("Lives", editLives, setEditLives, "Number of lives", { keyboardType: "numeric" })}
+                {renderDateField("Effective Date", editEffectiveDate, setEditEffectiveDate, showEditDatePicker, setShowEditDatePicker)}
+                {renderFormField("Premium ($)", editPremium, setEditPremium, "Premium amount", { keyboardType: "numeric" })}
+                {renderDateField("Follow-Up Date", editFollowUpDate, setEditFollowUpDate, showEditFollowUpPicker, setShowEditFollowUpPicker)}
+                {renderFormField("Notes", editNotes, setEditNotes, "Notes...", { multiline: true })}
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </KeyboardAvoidingView>
+          )}
+        </Modal>
+      </ScreenContainer>
+    </>
   );
 }
 

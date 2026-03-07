@@ -73,6 +73,7 @@ const KEYS = {
   deals: "ai_planner_deals",
   chatMessages: "ai_planner_chat",
   brokers: "ai_planner_brokers",
+  aiConsent: "ai_planner_ai_consent",
 } as const;
 
 // ─── Generic Helpers ────────────────────────────────────
@@ -300,4 +301,30 @@ export const ChatStore = {
   async clear(): Promise<void> {
     await AsyncStorage.removeItem(KEYS.chatMessages);
   },
+};
+
+// ─── AI Consent ──────────────────────────────────────────
+
+export const AIConsentStore = {
+  async hasConsent(): Promise<boolean> {
+    try {
+      const value = await AsyncStorage.getItem(KEYS.aiConsent);
+      if (value === null) return false;
+      return value === "true";
+    } catch {
+      return false;
+    }
+  },
+
+  async setConsent(consented: boolean): Promise<void> {
+    try {
+      await AsyncStorage.setItem(KEYS.aiConsent, String(consented));
+    } catch (err) {
+      console.error("Failed to save AI consent:", err);
+    }
+  },
+
+  async reset(): Promise<void> {
+    await AsyncStorage.removeItem(KEYS.aiConsent);
+  }
 };
