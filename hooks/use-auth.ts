@@ -1,6 +1,6 @@
 import * as Api from "@/lib/_core/api";
 import * as Auth from "@/lib/_core/auth";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Platform } from "react-native";
 
 type UseAuthOptions = {
@@ -12,6 +12,14 @@ export function useAuth(options?: UseAuthOptions) {
   const [user, setUser] = useState<Auth.User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
+  const userRef = useRef<Auth.User | null>(null);
+
+  const setUserIfDifferent = useCallback((newUser: Auth.User | null) => {
+    if (JSON.stringify(newUser) !== JSON.stringify(userRef.current)) {
+      userRef.current = newUser;
+      setUser(newUser);
+    }
+  }, []);
 
   const fetchUser = useCallback(async () => {
     console.log("[useAuth] fetchUser called");
@@ -34,13 +42,13 @@ export function useAuth(options?: UseAuthOptions) {
             loginMethod: apiUser.loginMethod,
             lastSignedIn: new Date(apiUser.lastSignedIn),
           };
-          setUser(userInfo);
+          setUserIfDifferent(userInfo);
           // Cache user info in localStorage for faster subsequent loads
           await Auth.setUserInfo(userInfo);
           console.log("[useAuth] Web user set from API:", userInfo);
         } else {
           console.log("[useAuth] Web: No authenticated user from API");
-          setUser(null);
+          setUserIfDifferent(null);
           await Auth.clearUserInfo();
         }
         return;
@@ -55,7 +63,7 @@ export function useAuth(options?: UseAuthOptions) {
       );
       if (!sessionToken) {
         console.log("[useAuth] No session token, setting user to null");
-        setUser(null);
+        setUserIfDifferent(null);
         return;
       }
 
@@ -64,16 +72,16 @@ export function useAuth(options?: UseAuthOptions) {
       console.log("[useAuth] Cached user:", cachedUser);
       if (cachedUser) {
         console.log("[useAuth] Using cached user info");
-        setUser(cachedUser);
+        setUserIfDifferent(cachedUser);
       } else {
         console.log("[useAuth] No cached user, setting user to null");
-        setUser(null);
+        setUserIfDifferent(null);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Failed to fetch user");
       console.error("[useAuth] fetchUser error:", error);
       setError(error);
-      setUser(null);
+      setUserIfDifferent(null);
     } finally {
       setLoading(false);
       console.log("[useAuth] fetchUser completed, loading:", false);
@@ -89,7 +97,7 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       await Auth.removeSessionToken();
       await Auth.clearUserInfo();
-      setUser(null);
+      setUserIfDifferent(null);
       setError(null);
     }
   }, []);
@@ -109,7 +117,7 @@ export function useAuth(options?: UseAuthOptions) {
           console.log("[useAuth] Native cached user check:", cachedUser);
           if (cachedUser) {
             console.log("[useAuth] Native: setting cached user immediately");
-            setUser(cachedUser);
+            setUserIfDifferent(cachedUser);
             setLoading(false);
           } else {
             // No cached user, check session token

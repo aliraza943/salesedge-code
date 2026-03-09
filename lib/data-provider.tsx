@@ -299,6 +299,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // ─── Load data from cloud or local ──────────────────
 
   useEffect(() => {
+    console.log("isCloudMode", isCloudMode)
     if (!isCloudMode) {
       // Offline / unauthenticated — load from AsyncStorage
       (async () => {
@@ -310,11 +311,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             ChatStore.getAll(),
             BrokerStore.getAll(),
           ]);
-          setEvents(le);
-          setRfps(lr);
-          setDeals(ld);
-          setChatMessages(lc);
-          setBrokers(lb);
+          if (JSON.stringify(le) !== JSON.stringify(eventsRef.current)) setEvents(le);
+          if (JSON.stringify(lr) !== JSON.stringify(rfpsRef.current)) setRfps(lr);
+          if (JSON.stringify(ld) !== JSON.stringify(dealsRef.current)) setDeals(ld);
+          if (JSON.stringify(lc) !== JSON.stringify(chatMessages)) setChatMessages(lc);
+          if (JSON.stringify(lb) !== JSON.stringify(brokersRef.current)) setBrokers(lb);
 
           try {
             const savedGoal = await AsyncStorage.getItem(SALES_GOAL_KEY);
@@ -1150,11 +1151,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         ChatStore.getAll(),
         BrokerStore.getAll(),
       ]);
-      setEvents(le);
-      setRfps(lr);
-      setDeals(ld);
-      setChatMessages(lc);
-      setBrokers(lb);
+      if (JSON.stringify(le) !== JSON.stringify(eventsRef.current)) setEvents(le);
+      if (JSON.stringify(lr) !== JSON.stringify(rfpsRef.current)) setRfps(lr);
+      if (JSON.stringify(ld) !== JSON.stringify(dealsRef.current)) setDeals(ld);
+      if (JSON.stringify(lc) !== JSON.stringify(chatMessages)) setChatMessages(lc);
+      if (JSON.stringify(lb) !== JSON.stringify(brokersRef.current)) setBrokers(lb);
 
       try {
         const savedGoal = await AsyncStorage.getItem(SALES_GOAL_KEY);
