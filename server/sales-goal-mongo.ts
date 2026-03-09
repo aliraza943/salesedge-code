@@ -1,13 +1,13 @@
 /**
  * Sales Goal REST API backed by MongoDB.
- * Collection: salesGoal (single document)
+ * Collection: salesGoal (one document per user, _id = userId)
  */
 
 import type { Request, Response } from "express";
 import { getDb } from "./mongo-client";
+import { authRequired } from "./auth-mongo";
 
 const COLLECTION_NAME = "salesGoal";
-const DEFAULT_ID = "default";
 
 export type SalesGoalDocument = {
   _id?: string;
@@ -30,10 +30,15 @@ function toResponse(doc: SalesGoalDocument): { currentSales: number; goalAmount:
   };
 }
 
-export async function getSalesGoal(_req: Request, res: Response): Promise<void> {
+export async function getSalesGoal(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    const doc = await col.findOne({ _id: DEFAULT_ID });
+    const doc = await col.findOne({ _id: userId });
     if (!doc) {
       res.json({
         currentSales: 0,
@@ -51,6 +56,11 @@ export async function getSalesGoal(_req: Request, res: Response): Promise<void> 
 
 export async function upsertSalesGoal(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const body = req.body as Record<string, unknown>;
     const currentSales = typeof body.currentSales === "string" ? body.currentSales : String(body.currentSales ?? "0");
     const goalAmount = typeof body.goalAmount === "string" ? body.goalAmount : String(body.goalAmount ?? "12000000");
@@ -58,14 +68,14 @@ export async function upsertSalesGoal(req: Request, res: Response): Promise<void
 
     const col = await getCollection();
     const doc: SalesGoalDocument = {
-      _id: DEFAULT_ID,
+      _id: userId,
       currentSales,
       goalAmount,
       goalDeadline,
       updatedAt: new Date().toISOString(),
     };
     await col.updateOne(
-      { _id: DEFAULT_ID },
+      { _id: userId },
       { $set: doc },
       { upsert: true }
     );
@@ -77,6 +87,6 @@ export async function upsertSalesGoal(req: Request, res: Response): Promise<void
 }
 
 export function registerSalesGoalRoutes(app: import("express").Express): void {
-  app.get("/api/sales-goal", getSalesGoal);
-  app.put("/api/sales-goal", upsertSalesGoal);
+  app.get("/api/sales-goal", authRequired, getSalesGoal);
+  app.put("/api/sales-goal", authRequired, upsertSalesGoal);
 }

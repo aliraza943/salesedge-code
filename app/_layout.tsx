@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ActivityIndicator, View, Text } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
 import { Platform } from "react-native";
@@ -20,6 +21,7 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { DataProvider } from "@/lib/data-provider";
 import { configureNotifications } from "@/lib/notification-manager";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
+import { useAuth } from "@/hooks/use-auth";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 const DEFAULT_WEB_FRAME: Rect = { x: 0, y: 0, width: 0, height: 0 };
@@ -65,6 +67,7 @@ export default function RootLayout() {
       }),
   );
   const [trpcClient] = useState(() => createTRPCClient());
+  const { user, loading: authLoading } = useAuth({ autoFetch: true });
 
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
@@ -82,14 +85,26 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <trpc.Provider client={trpcClient} queryClient={queryClient}>
         <QueryClientProvider client={queryClient}>
-          <DataProvider>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="weekly-summary" options={{ presentation: "card" }} />
-              <Stack.Screen name="oauth/callback" />
-            </Stack>
-            <StatusBar style="auto" />
-          </DataProvider>
+          {authLoading ? (
+            <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+              <ActivityIndicator size="large" />
+              <Text style={{ marginTop: 12 }}>Loading...</Text>
+            </View>
+          ) : (
+            <DataProvider>
+              <Stack
+                screenOptions={{ headerShown: false }}
+                initialRouteName={user ? "(tabs)" : "login"}
+              >
+                <Stack.Screen name="login" />
+                <Stack.Screen name="sign-up" />
+                <Stack.Screen name="(tabs)" />
+                <Stack.Screen name="profile" options={{ presentation: "card" }} />
+                <Stack.Screen name="weekly-summary" options={{ presentation: "card" }} />
+              </Stack>
+            </DataProvider>
+          )}
+          <StatusBar style="auto" />
         </QueryClientProvider>
       </trpc.Provider>
     </GestureHandlerRootView>

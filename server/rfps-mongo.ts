@@ -6,12 +6,14 @@
 
 import { MongoClient, ObjectId } from "mongodb";
 import type { Request, Response } from "express";
+import { authRequired } from "./auth-mongo";
 
 const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/aiplanner";
 const COLLECTION_NAME = "rfps";
 
 export type RfpDocument = {
   _id?: ObjectId;
+  userId: string;
   title: string;
   client: string;
   brokerContact?: string;
@@ -58,10 +60,15 @@ function toRfpResponse(doc: RfpDocument & { _id: ObjectId }) {
   };
 }
 
-export async function listRfps(_req: Request, res: Response): Promise<void> {
+export async function listRfps(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
+    const docs = await col.find({ userId }).sort({ createdAt: -1 }).toArray();
     res.json(docs.map(toRfpResponse));
   } catch (err) {
     console.error("[rfps-mongo] list error:", err);
@@ -71,6 +78,11 @@ export async function listRfps(_req: Request, res: Response): Promise<void> {
 
 export async function getRfpById(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -84,7 +96,7 @@ export async function getRfpById(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const doc = await col.findOne({ _id: oid });
+    const doc = await col.findOne({ _id: oid, userId });
     if (!doc) {
       res.status(404).json({ error: "RFP not found" });
       return;
@@ -98,6 +110,11 @@ export async function getRfpById(req: Request, res: Response): Promise<void> {
 
 export async function createRfp(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const body = req.body as Record<string, unknown>;
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const clientName = typeof body.client === "string" ? body.client.trim() : "";
@@ -107,6 +124,7 @@ export async function createRfp(req: Request, res: Response): Promise<void> {
     }
     const status = body.status === "recommended" || body.status === "sold" ? body.status : "draft";
     const doc: RfpDocument = {
+      userId,
       title,
       client: clientName,
       brokerContact: typeof body.brokerContact === "string" ? body.brokerContact : undefined,
@@ -135,6 +153,11 @@ export async function createRfp(req: Request, res: Response): Promise<void> {
 
 export async function updateRfp(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -162,7 +185,7 @@ export async function updateRfp(req: Request, res: Response): Promise<void> {
 
     if (Object.keys(update).length === 0) {
       const col = await getCollection();
-      const doc = await col.findOne({ _id: oid });
+      const doc = await col.findOne({ _id: oid, userId });
       if (!doc) {
         res.status(404).json({ error: "RFP not found" });
         return;
@@ -173,7 +196,7 @@ export async function updateRfp(req: Request, res: Response): Promise<void> {
 
     const col = await getCollection();
     const result = await col.findOneAndUpdate(
-      { _id: oid },
+      { _id: oid, userId },
       { $set: update },
       { returnDocument: "after" }
     );
@@ -190,6 +213,11 @@ export async function updateRfp(req: Request, res: Response): Promise<void> {
 
 export async function deleteRfp(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -203,7 +231,7 @@ export async function deleteRfp(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const result = await col.deleteOne({ _id: oid });
+    const result = await col.deleteOne({ _id: oid, userId });
     if (result.deletedCount === 0) {
       res.status(404).json({ error: "RFP not found" });
       return;
@@ -216,9 +244,9 @@ export async function deleteRfp(req: Request, res: Response): Promise<void> {
 }
 
 export function registerRfpRoutes(app: import("express").Express): void {
-  app.get("/api/rfps", listRfps);
-  app.get("/api/rfps/:id", getRfpById);
-  app.post("/api/rfps", createRfp);
-  app.put("/api/rfps/:id", updateRfp);
-  app.delete("/api/rfps/:id", deleteRfp);
+  app.get("/api/rfps", authRequired, listRfps);
+  app.get("/api/rfps/:id", authRequired, getRfpById);
+  app.post("/api/rfps", authRequired, createRfp);
+  app.put("/api/rfps/:id", authRequired, updateRfp);
+  app.delete("/api/rfps/:id", authRequired, deleteRfp);
 }

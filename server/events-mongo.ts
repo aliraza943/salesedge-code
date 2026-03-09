@@ -1,16 +1,18 @@
 /**
  * Events REST API backed by MongoDB.
- * Collection: events
+ * Collection: events (scoped by userId)
  */
 
 import { ObjectId } from "mongodb";
 import type { Request, Response } from "express";
 import { getDb } from "./mongo-client";
+import { authRequired } from "./auth-mongo";
 
 const COLLECTION_NAME = "events";
 
 export type EventDocument = {
   _id?: ObjectId;
+  userId: string;
   title: string;
   description?: string;
   date: string;
@@ -42,10 +44,15 @@ function toResponse(doc: EventDocument & { _id: ObjectId }) {
   };
 }
 
-export async function listEvents(_req: Request, res: Response): Promise<void> {
+export async function listEvents(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    const docs = await col.find({}).sort({ date: 1, startTime: 1 }).toArray();
+    const docs = await col.find({ userId }).sort({ date: 1, startTime: 1 }).toArray();
     res.json(docs.map((d) => toResponse(d as EventDocument & { _id: ObjectId })));
   } catch (err) {
     console.error("[events-mongo] list error:", err);
@@ -55,6 +62,11 @@ export async function listEvents(_req: Request, res: Response): Promise<void> {
 
 export async function getEventById(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -68,7 +80,7 @@ export async function getEventById(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const doc = await col.findOne({ _id: oid });
+    const doc = await col.findOne({ _id: oid, userId });
     if (!doc) {
       res.status(404).json({ error: "Event not found" });
       return;
@@ -82,6 +94,11 @@ export async function getEventById(req: Request, res: Response): Promise<void> {
 
 export async function createEvent(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const body = req.body as Record<string, unknown>;
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const date = typeof body.date === "string" ? body.date.trim() : "";
@@ -90,6 +107,7 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
       return;
     }
     const doc: EventDocument = {
+      userId,
       title,
       date,
       description: typeof body.description === "string" ? body.description : undefined,
@@ -116,6 +134,11 @@ export async function createEvent(req: Request, res: Response): Promise<void> {
 
 export async function updateEvent(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -141,7 +164,7 @@ export async function updateEvent(req: Request, res: Response): Promise<void> {
 
     const col = await getCollection();
     if (Object.keys(update).length === 0) {
-      const doc = await col.findOne({ _id: oid });
+      const doc = await col.findOne({ _id: oid, userId });
       if (!doc) {
         res.status(404).json({ error: "Event not found" });
         return;
@@ -150,7 +173,7 @@ export async function updateEvent(req: Request, res: Response): Promise<void> {
       return;
     }
     const result = await col.findOneAndUpdate(
-      { _id: oid },
+      { _id: oid, userId },
       { $set: update },
       { returnDocument: "after" }
     );
@@ -167,6 +190,11 @@ export async function updateEvent(req: Request, res: Response): Promise<void> {
 
 export async function deleteEvent(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -180,7 +208,7 @@ export async function deleteEvent(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const result = await col.deleteOne({ _id: oid });
+    const result = await col.deleteOne({ _id: oid, userId });
     if (result.deletedCount === 0) {
       res.status(404).json({ error: "Event not found" });
       return;
@@ -193,9 +221,9 @@ export async function deleteEvent(req: Request, res: Response): Promise<void> {
 }
 
 export function registerEventRoutes(app: import("express").Express): void {
-  app.get("/api/events", listEvents);
-  app.get("/api/events/:id", getEventById);
-  app.post("/api/events", createEvent);
-  app.put("/api/events/:id", updateEvent);
-  app.delete("/api/events/:id", deleteEvent);
+  app.get("/api/events", authRequired, listEvents);
+  app.get("/api/events/:id", authRequired, getEventById);
+  app.post("/api/events", authRequired, createEvent);
+  app.put("/api/events/:id", authRequired, updateEvent);
+  app.delete("/api/events/:id", authRequired, deleteEvent);
 }

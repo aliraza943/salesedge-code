@@ -3,6 +3,7 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { authHeaders } from "@/lib/api-auth";
 
 export type SalesGoal = {
   currentSales: number;
@@ -13,7 +14,7 @@ export type SalesGoal = {
 const getBase = () => `${getApiBaseUrl()}/api/sales-goal`;
 
 export async function fetchSalesGoal(): Promise<SalesGoal> {
-  const res = await fetch(getBase(), { credentials: "include" });
+  const res = await fetch(getBase(), { headers: await authHeaders(), credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch sales goal: ${res.status}`);
   const data = await res.json();
   return {
@@ -35,7 +36,7 @@ export async function upsertSalesGoal(updates: {
 
   const res = await fetch(getBase(), {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(body),
     credentials: "include",
   });

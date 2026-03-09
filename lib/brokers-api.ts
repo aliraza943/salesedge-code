@@ -3,6 +3,7 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { authHeaders } from "@/lib/api-auth";
 import type { LocalBroker, BrokerNote } from "@/lib/local-store";
 
 const getBase = () => `${getApiBaseUrl()}/api/brokers`;
@@ -25,7 +26,7 @@ function toLocalBroker(r: Record<string, unknown>): LocalBroker {
 }
 
 export async function fetchBrokers(): Promise<LocalBroker[]> {
-  const res = await fetch(getBase(), { credentials: "include" });
+  const res = await fetch(getBase(), { headers: await authHeaders(), credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch brokers: ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data.map(toLocalBroker) : [];
@@ -36,7 +37,7 @@ export async function createBroker(
 ): Promise<LocalBroker> {
   const res = await fetch(getBase(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify({ ...data, notes: data.notes || [] }),
     credentials: "include",
   });
@@ -54,7 +55,7 @@ export async function updateBroker(
 ): Promise<LocalBroker> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -69,6 +70,7 @@ export async function updateBroker(
 export async function deleteBroker(id: string): Promise<void> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    headers: await authHeaders(),
     credentials: "include",
   });
   if (!res.ok && res.status !== 204) {
@@ -80,7 +82,7 @@ export async function deleteBroker(id: string): Promise<void> {
 export async function addBrokerNote(brokerId: string, content: string): Promise<BrokerNote> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(brokerId)}/notes`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify({ content }),
     credentials: "include",
   });
@@ -99,7 +101,7 @@ export async function addBrokerNote(brokerId: string, content: string): Promise<
 export async function removeBrokerNote(brokerId: string, noteId: string): Promise<void> {
   const res = await fetch(
     `${getBase()}/${encodeURIComponent(brokerId)}/notes/${encodeURIComponent(noteId)}`,
-    { method: "DELETE", credentials: "include" }
+    { method: "DELETE", headers: await authHeaders(), credentials: "include" }
   );
   if (!res.ok && res.status !== 204) {
     const err = await res.json().catch(() => ({}));

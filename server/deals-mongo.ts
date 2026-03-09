@@ -6,6 +6,7 @@
 import { ObjectId } from "mongodb";
 import type { Request, Response } from "express";
 import { getDb } from "./mongo-client";
+import { authRequired } from "./auth-mongo";
 
 const COLLECTION_NAME = "deals";
 
@@ -13,6 +14,7 @@ const STAGES = ["lead", "qualified", "proposal", "negotiation", "closed_won", "c
 
 export type DealDocument = {
   _id?: ObjectId;
+  userId: string;
   title: string;
   client: string;
   stage: string;
@@ -40,10 +42,15 @@ function toResponse(doc: DealDocument & { _id: ObjectId }) {
   };
 }
 
-export async function listDeals(_req: Request, res: Response): Promise<void> {
+export async function listDeals(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
+    const docs = await col.find({ userId }).sort({ createdAt: -1 }).toArray();
     res.json(docs.map((d) => toResponse(d as DealDocument & { _id: ObjectId })));
   } catch (err) {
     console.error("[deals-mongo] list error:", err);
@@ -53,6 +60,11 @@ export async function listDeals(_req: Request, res: Response): Promise<void> {
 
 export async function getDealById(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -66,7 +78,7 @@ export async function getDealById(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const doc = await col.findOne({ _id: oid });
+    const doc = await col.findOne({ _id: oid, userId });
     if (!doc) {
       res.status(404).json({ error: "Deal not found" });
       return;
@@ -80,6 +92,11 @@ export async function getDealById(req: Request, res: Response): Promise<void> {
 
 export async function createDeal(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const body = req.body as Record<string, unknown>;
     const title = typeof body.title === "string" ? body.title.trim() : "";
     const client = typeof body.client === "string" ? body.client.trim() : "";
@@ -89,6 +106,7 @@ export async function createDeal(req: Request, res: Response): Promise<void> {
     }
     const stage = STAGES.includes(body.stage as any) ? body.stage : "lead";
     const doc: DealDocument = {
+      userId,
       title,
       client,
       stage,
@@ -113,6 +131,11 @@ export async function createDeal(req: Request, res: Response): Promise<void> {
 
 export async function updateDeal(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -136,7 +159,7 @@ export async function updateDeal(req: Request, res: Response): Promise<void> {
 
     const col = await getCollection();
     if (Object.keys(update).length === 0) {
-      const doc = await col.findOne({ _id: oid });
+      const doc = await col.findOne({ _id: oid, userId });
       if (!doc) {
         res.status(404).json({ error: "Deal not found" });
         return;
@@ -145,7 +168,7 @@ export async function updateDeal(req: Request, res: Response): Promise<void> {
       return;
     }
     const result = await col.findOneAndUpdate(
-      { _id: oid },
+      { _id: oid, userId },
       { $set: update },
       { returnDocument: "after" }
     );
@@ -162,6 +185,11 @@ export async function updateDeal(req: Request, res: Response): Promise<void> {
 
 export async function deleteDeal(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -175,7 +203,7 @@ export async function deleteDeal(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const result = await col.deleteOne({ _id: oid });
+    const result = await col.deleteOne({ _id: oid, userId });
     if (result.deletedCount === 0) {
       res.status(404).json({ error: "Deal not found" });
       return;
@@ -188,9 +216,9 @@ export async function deleteDeal(req: Request, res: Response): Promise<void> {
 }
 
 export function registerDealRoutes(app: import("express").Express): void {
-  app.get("/api/deals", listDeals);
-  app.get("/api/deals/:id", getDealById);
-  app.post("/api/deals", createDeal);
-  app.put("/api/deals/:id", updateDeal);
-  app.delete("/api/deals/:id", deleteDeal);
+  app.get("/api/deals", authRequired, listDeals);
+  app.get("/api/deals/:id", authRequired, getDealById);
+  app.post("/api/deals", authRequired, createDeal);
+  app.put("/api/deals/:id", authRequired, updateDeal);
+  app.delete("/api/deals/:id", authRequired, deleteDeal);
 }

@@ -1,16 +1,18 @@
 /**
  * Chat REST API backed by MongoDB.
- * Collection: chatMessages
+ * Collection: chatMessages (scoped by userId)
  */
 
 import { ObjectId } from "mongodb";
 import type { Request, Response } from "express";
 import { getDb } from "./mongo-client";
+import { authRequired } from "./auth-mongo";
 
 const COLLECTION_NAME = "chatMessages";
 
 export type ChatMessageDocument = {
   _id?: ObjectId;
+  userId: string;
   role: "user" | "assistant";
   content: string;
   actions?: Array<{ type: string; result?: unknown; data?: Record<string, unknown> }>;
@@ -32,10 +34,15 @@ function toResponse(doc: ChatMessageDocument & { _id: ObjectId }) {
   };
 }
 
-export async function listChatMessages(_req: Request, res: Response): Promise<void> {
+export async function listChatMessages(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    const docs = await col.find({}).sort({ createdAt: 1 }).toArray();
+    const docs = await col.find({ userId }).sort({ createdAt: 1 }).toArray();
     res.json(docs.map((d) => toResponse(d as ChatMessageDocument & { _id: ObjectId })));
   } catch (err) {
     console.error("[chat-mongo] list error:", err);
@@ -45,10 +52,16 @@ export async function listChatMessages(_req: Request, res: Response): Promise<vo
 
 export async function addChatMessage(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const body = req.body as Record<string, unknown>;
     const role = body.role === "assistant" ? "assistant" : "user";
     const content = typeof body.content === "string" ? body.content : "";
     const doc: ChatMessageDocument = {
+      userId,
       role,
       content,
       actions: Array.isArray(body.actions) ? body.actions as any : undefined,
@@ -68,10 +81,15 @@ export async function addChatMessage(req: Request, res: Response): Promise<void>
   }
 }
 
-export async function clearChat(_req: Request, res: Response): Promise<void> {
+export async function clearChat(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    await col.deleteMany({});
+    await col.deleteMany({ userId });
     res.status(204).send();
   } catch (err) {
     console.error("[chat-mongo] clear error:", err);
@@ -80,7 +98,7 @@ export async function clearChat(_req: Request, res: Response): Promise<void> {
 }
 
 export function registerChatRoutes(app: import("express").Express): void {
-  app.get("/api/chat", listChatMessages);
-  app.post("/api/chat", addChatMessage);
-  app.delete("/api/chat", clearChat);
+  app.get("/api/chat", authRequired, listChatMessages);
+  app.post("/api/chat", authRequired, addChatMessage);
+  app.delete("/api/chat", authRequired, clearChat);
 }

@@ -3,6 +3,7 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { authHeaders } from "@/lib/api-auth";
 import type { LocalDeal } from "@/lib/local-store";
 
 const getBase = () => `${getApiBaseUrl()}/api/deals`;
@@ -21,7 +22,7 @@ function toLocalDeal(r: Record<string, unknown>): LocalDeal {
 }
 
 export async function fetchDeals(): Promise<LocalDeal[]> {
-  const res = await fetch(getBase(), { credentials: "include" });
+  const res = await fetch(getBase(), { headers: await authHeaders(), credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch deals: ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data.map(toLocalDeal) : [];
@@ -30,7 +31,7 @@ export async function fetchDeals(): Promise<LocalDeal[]> {
 export async function createDeal(data: Omit<LocalDeal, "id" | "createdAt">): Promise<LocalDeal> {
   const res = await fetch(getBase(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -48,7 +49,7 @@ export async function updateDeal(
 ): Promise<LocalDeal> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -63,6 +64,7 @@ export async function updateDeal(
 export async function deleteDeal(id: string): Promise<void> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    headers: await authHeaders(),
     credentials: "include",
   });
   if (!res.ok && res.status !== 204) {

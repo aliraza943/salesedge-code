@@ -4,6 +4,7 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { authHeaders } from "@/lib/api-auth";
 import type { LocalRfp } from "@/lib/local-store";
 
 const getBase = () => `${getApiBaseUrl()}/api/rfps`;
@@ -39,14 +40,14 @@ function toLocalRfp(r: {
 }
 
 export async function fetchRfps(): Promise<LocalRfp[]> {
-  const res = await fetch(getBase(), { credentials: "include" });
+  const res = await fetch(getBase(), { headers: await authHeaders(), credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch RFPs: ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data.map(toLocalRfp) : [];
 }
 
 export async function fetchRfpById(id: string): Promise<LocalRfp | null> {
-  const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, { credentials: "include" });
+  const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, { headers: await authHeaders(), credentials: "include" });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Failed to fetch RFP: ${res.status}`);
   const data = await res.json();
@@ -58,7 +59,7 @@ export type CreateRfpInput = Omit<LocalRfp, "id" | "createdAt">;
 export async function createRfp(data: CreateRfpInput): Promise<LocalRfp> {
   const res = await fetch(getBase(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -76,7 +77,7 @@ export async function updateRfp(
 ): Promise<LocalRfp> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -91,6 +92,7 @@ export async function updateRfp(
 export async function deleteRfp(id: string): Promise<void> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    headers: await authHeaders(),
     credentials: "include",
   });
   if (!res.ok && res.status !== 204) {

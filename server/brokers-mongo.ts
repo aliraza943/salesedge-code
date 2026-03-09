@@ -6,6 +6,7 @@
 import { ObjectId } from "mongodb";
 import type { Request, Response } from "express";
 import { getDb } from "./mongo-client";
+import { authRequired } from "./auth-mongo";
 
 const COLLECTION_NAME = "brokers";
 
@@ -17,6 +18,7 @@ export type BrokerNoteDoc = {
 
 export type BrokerDocument = {
   _id?: ObjectId;
+  userId: string;
   name: string;
   company?: string;
   phone?: string;
@@ -42,10 +44,15 @@ function toResponse(doc: BrokerDocument & { _id: ObjectId }) {
   };
 }
 
-export async function listBrokers(_req: Request, res: Response): Promise<void> {
+export async function listBrokers(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const col = await getCollection();
-    const docs = await col.find({}).sort({ createdAt: -1 }).toArray();
+    const docs = await col.find({ userId }).sort({ createdAt: -1 }).toArray();
     res.json(docs.map((d) => toResponse(d as BrokerDocument & { _id: ObjectId })));
   } catch (err) {
     console.error("[brokers-mongo] list error:", err);
@@ -55,6 +62,11 @@ export async function listBrokers(_req: Request, res: Response): Promise<void> {
 
 export async function getBrokerById(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -68,7 +80,7 @@ export async function getBrokerById(req: Request, res: Response): Promise<void> 
       return;
     }
     const col = await getCollection();
-    const doc = await col.findOne({ _id: oid });
+    const doc = await col.findOne({ _id: oid, userId });
     if (!doc) {
       res.status(404).json({ error: "Broker not found" });
       return;
@@ -82,6 +94,11 @@ export async function getBrokerById(req: Request, res: Response): Promise<void> 
 
 export async function createBroker(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const body = req.body as Record<string, unknown>;
     const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!name) {
@@ -96,6 +113,7 @@ export async function createBroker(req: Request, res: Response): Promise<void> {
         }))
       : [];
     const doc: BrokerDocument = {
+      userId,
       name,
       company: typeof body.company === "string" ? body.company : undefined,
       phone: typeof body.phone === "string" ? body.phone : undefined,
@@ -119,6 +137,11 @@ export async function createBroker(req: Request, res: Response): Promise<void> {
 
 export async function updateBroker(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -140,7 +163,7 @@ export async function updateBroker(req: Request, res: Response): Promise<void> {
 
     const col = await getCollection();
     if (Object.keys(update).length === 0) {
-      const doc = await col.findOne({ _id: oid });
+      const doc = await col.findOne({ _id: oid, userId });
       if (!doc) {
         res.status(404).json({ error: "Broker not found" });
         return;
@@ -149,7 +172,7 @@ export async function updateBroker(req: Request, res: Response): Promise<void> {
       return;
     }
     const result = await col.findOneAndUpdate(
-      { _id: oid },
+      { _id: oid, userId },
       { $set: update },
       { returnDocument: "after" }
     );
@@ -166,6 +189,11 @@ export async function updateBroker(req: Request, res: Response): Promise<void> {
 
 export async function deleteBroker(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id } = req.params;
     if (!id) {
       res.status(400).json({ error: "Missing id" });
@@ -179,7 +207,7 @@ export async function deleteBroker(req: Request, res: Response): Promise<void> {
       return;
     }
     const col = await getCollection();
-    const result = await col.deleteOne({ _id: oid });
+    const result = await col.deleteOne({ _id: oid, userId });
     if (result.deletedCount === 0) {
       res.status(404).json({ error: "Broker not found" });
       return;
@@ -193,6 +221,11 @@ export async function deleteBroker(req: Request, res: Response): Promise<void> {
 
 export async function addBrokerNote(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id: brokerId } = req.params;
     if (!brokerId) {
       res.status(400).json({ error: "Missing broker id" });
@@ -218,7 +251,7 @@ export async function addBrokerNote(req: Request, res: Response): Promise<void> 
     };
     const col = await getCollection();
     const result = await col.findOneAndUpdate(
-      { _id: oid },
+      { _id: oid, userId },
       { $push: { notes: note } },
       { returnDocument: "after" }
     );
@@ -235,6 +268,11 @@ export async function addBrokerNote(req: Request, res: Response): Promise<void> 
 
 export async function removeBrokerNote(req: Request, res: Response): Promise<void> {
   try {
+    const userId = req.userId;
+    if (!userId) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
     const { id: brokerId, noteId } = req.params;
     if (!brokerId || !noteId) {
       res.status(400).json({ error: "Missing broker id or note id" });
@@ -249,7 +287,7 @@ export async function removeBrokerNote(req: Request, res: Response): Promise<voi
     }
     const col = await getCollection();
     const result = await col.findOneAndUpdate(
-      { _id: oid },
+      { _id: oid, userId },
       { $pull: { notes: { id: noteId } } },
       { returnDocument: "after" }
     );
@@ -265,11 +303,11 @@ export async function removeBrokerNote(req: Request, res: Response): Promise<voi
 }
 
 export function registerBrokerRoutes(app: import("express").Express): void {
-  app.get("/api/brokers", listBrokers);
-  app.get("/api/brokers/:id", getBrokerById);
-  app.post("/api/brokers", createBroker);
-  app.put("/api/brokers/:id", updateBroker);
-  app.delete("/api/brokers/:id", deleteBroker);
-  app.post("/api/brokers/:id/notes", addBrokerNote);
-  app.delete("/api/brokers/:id/notes/:noteId", removeBrokerNote);
+  app.get("/api/brokers", authRequired, listBrokers);
+  app.get("/api/brokers/:id", authRequired, getBrokerById);
+  app.post("/api/brokers", authRequired, createBroker);
+  app.put("/api/brokers/:id", authRequired, updateBroker);
+  app.delete("/api/brokers/:id", authRequired, deleteBroker);
+  app.post("/api/brokers/:id/notes", authRequired, addBrokerNote);
+  app.delete("/api/brokers/:id/notes/:noteId", authRequired, removeBrokerNote);
 }

@@ -5,7 +5,7 @@ import net from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerAuthRoutes } from "../auth-mongo";
 import { registerExcelRoutes } from "../excel-export";
 import { registerDeviceDataRoutes } from "../device-data";
 import { registerRfpRoutes } from "../rfps-mongo";
@@ -64,7 +64,7 @@ async function startServer() {
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  registerOAuthRoutes(app);
+  registerAuthRoutes(app);
   registerExcelRoutes(app);
   registerDeviceDataRoutes(app);
   registerRfpRoutes(app);

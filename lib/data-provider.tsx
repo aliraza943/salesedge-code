@@ -155,10 +155,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const isCloudRef = useRef(isCloudMode);
   isCloudRef.current = isCloudMode;
 
-  // ─── Load all data from MongoDB-backed REST APIs ──────────────────
+  // ─── Load all data from MongoDB-backed REST APIs (only when authenticated) ──────────────────
 
   useEffect(() => {
     requestNotificationPermissions();
+    if (!isCloudMode) {
+      setIsLoading(false);
+      return;
+    }
     (async () => {
       try {
         const [eventsList, rfpsList, dealsList, brokersList, chatList, goal] = await Promise.all([
@@ -181,7 +185,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
       }
     })();
-  }, []);
+  }, [isCloudMode]);
 
   // ─── Event CRUD ────────────────────────────────────
 
@@ -408,6 +412,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // ─── Refresh ───────────────────────────────────────
 
   const refreshAll = useCallback(async () => {
+    if (!isCloudMode) return;
     try {
       const [eventsList, rfpsList, dealsList, brokersList, chatList, goal] = await Promise.all([
         eventsApi.fetchEvents(),
@@ -426,7 +431,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     } catch (e) {
       console.error("[DataProvider] refreshAll failed:", e);
     }
-  }, []);
+  }, [isCloudMode]);
 
   return (
     <DataContext.Provider

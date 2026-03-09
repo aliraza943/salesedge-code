@@ -3,6 +3,7 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { authHeaders } from "@/lib/api-auth";
 import type { LocalEvent } from "@/lib/local-store";
 
 const getBase = () => `${getApiBaseUrl()}/api/events`;
@@ -23,7 +24,7 @@ function toLocalEvent(r: Record<string, unknown>): LocalEvent {
 }
 
 export async function fetchEvents(): Promise<LocalEvent[]> {
-  const res = await fetch(getBase(), { credentials: "include" });
+  const res = await fetch(getBase(), { headers: await authHeaders(), credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch events: ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data.map(toLocalEvent) : [];
@@ -32,7 +33,7 @@ export async function fetchEvents(): Promise<LocalEvent[]> {
 export async function createEvent(data: Omit<LocalEvent, "id" | "createdAt">): Promise<LocalEvent> {
   const res = await fetch(getBase(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -50,7 +51,7 @@ export async function updateEvent(
 ): Promise<LocalEvent> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(data),
     credentials: "include",
   });
@@ -65,6 +66,7 @@ export async function updateEvent(
 export async function deleteEvent(id: string): Promise<void> {
   const res = await fetch(`${getBase()}/${encodeURIComponent(id)}`, {
     method: "DELETE",
+    headers: await authHeaders(),
     credentials: "include",
   });
   if (!res.ok && res.status !== 204) {

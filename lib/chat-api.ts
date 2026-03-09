@@ -3,6 +3,7 @@
  */
 
 import { getApiBaseUrl } from "@/constants/oauth";
+import { authHeaders } from "@/lib/api-auth";
 import type { LocalChatMessage } from "@/lib/local-store";
 
 const getBase = () => `${getApiBaseUrl()}/api/chat`;
@@ -18,7 +19,7 @@ function toLocalChatMessage(r: Record<string, unknown>): LocalChatMessage {
 }
 
 export async function fetchChatMessages(): Promise<LocalChatMessage[]> {
-  const res = await fetch(getBase(), { credentials: "include" });
+  const res = await fetch(getBase(), { headers: await authHeaders(), credentials: "include" });
   if (!res.ok) throw new Error(`Failed to fetch chat: ${res.status}`);
   const data = await res.json();
   return Array.isArray(data) ? data.map(toLocalChatMessage) : [];
@@ -29,7 +30,7 @@ export async function addChatMessage(
 ): Promise<LocalChatMessage> {
   const res = await fetch(getBase(), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: await authHeaders(),
     body: JSON.stringify(msg),
     credentials: "include",
   });
@@ -42,7 +43,7 @@ export async function addChatMessage(
 }
 
 export async function clearChat(): Promise<void> {
-  const res = await fetch(getBase(), { method: "DELETE", credentials: "include" });
+  const res = await fetch(getBase(), { method: "DELETE", headers: await authHeaders(), credentials: "include" });
   if (!res.ok && res.status !== 204) {
     const err = await res.json().catch(() => ({}));
     throw new Error((err as any).error || `Failed to clear chat: ${res.status}`);

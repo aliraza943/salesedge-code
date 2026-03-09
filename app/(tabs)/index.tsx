@@ -8,6 +8,7 @@ import { Image } from "expo-image";
 import { ScreenContainer } from "@/components/screen-container";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { useAuth } from "@/hooks/use-auth";
 import { useData } from "@/lib/data-provider";
 import { getGreeting, getTodayStr, formatTime, formatTimeRange, formatCurrency, formatCurrencyLarge, countWorkDays, daysUntil } from "@/lib/utils";
 import { parseLocalDate, formatDateShortTz } from "@/lib/timezone";
@@ -17,6 +18,7 @@ import { getApiBaseUrl } from "@/constants/oauth";
 export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { user } = useAuth({ autoFetch: true });
   const { events, rfps, deals, isLoading, refreshAll, salesGoal, updateSalesGoal, isCloudMode, isSyncing, syncLocalToCloud } = useData();
   const [exporting, setExporting] = useState<string | null>(null);
   const [showEditGoal, setShowEditGoal] = useState(false);
@@ -205,33 +207,45 @@ export default function HomeScreen() {
     <ScreenContainer className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
         {/* Header */}
-        <View className="px-5 pt-4 pb-2">
-          <Text className="text-3xl font-bold" style={{ color: colors.foreground }}>
-            {getGreeting()}
-          </Text>
-          <View className="flex-row items-center mt-1 gap-2">
-            <Text className="text-base" style={{ color: colors.muted }}>
-              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
+        <View className="px-5 pt-4 pb-2 flex-row items-start justify-between">
+          <View className="flex-1">
+            <Text className="text-3xl font-bold" style={{ color: colors.foreground }}>
+              {getGreeting()}
             </Text>
-            {isCloudMode && (
-              <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.success + '20' }}>
-                {isSyncing ? (
-                  <ActivityIndicator size={10} color={colors.primary} />
-                ) : (
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success }} />
-                )}
-                <Text className="text-[10px] font-medium" style={{ color: isSyncing ? colors.primary : colors.success }}>
-                  {isSyncing ? 'Syncing...' : 'Cloud'}
-                </Text>
-              </View>
-            )}
-            {!isCloudMode && (
-              <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.muted + '20' }}>
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted }} />
-                <Text className="text-[10px] font-medium" style={{ color: colors.muted }}>Local</Text>
-              </View>
-            )}
+            <View className="flex-row items-center mt-1 gap-2">
+              <Text className="text-base" style={{ color: colors.muted }}>
+                {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })}
+              </Text>
+              {isCloudMode && (
+                <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.success + '20' }}>
+                  {isSyncing ? (
+                    <ActivityIndicator size={10} color={colors.primary} />
+                  ) : (
+                    <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success }} />
+                  )}
+                  <Text className="text-[10px] font-medium" style={{ color: isSyncing ? colors.primary : colors.success }}>
+                    {isSyncing ? 'Syncing...' : 'Cloud'}
+                  </Text>
+                </View>
+              )}
+              {!isCloudMode && (
+                <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-full" style={{ backgroundColor: colors.muted + '20' }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.muted }} />
+                  <Text className="text-[10px] font-medium" style={{ color: colors.muted }}>Local</Text>
+                </View>
+              )}
+            </View>
           </View>
+          <Pressable
+            onPress={() => {
+              haptic();
+              router.push("/profile");
+            }}
+            className="p-2 rounded-full"
+            style={{ backgroundColor: colors.surface }}
+          >
+            <IconSymbol name="person.fill" size={24} color={colors.foreground} />
+          </Pressable>
         </View>
 
         {/* ═══ Sales Goal Tracker ═══ */}
