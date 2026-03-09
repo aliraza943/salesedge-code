@@ -8,6 +8,12 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerExcelRoutes } from "../excel-export";
 import { registerDeviceDataRoutes } from "../device-data";
+import { registerRfpRoutes } from "../rfps-mongo";
+import { registerEventRoutes } from "../events-mongo";
+import { registerDealRoutes } from "../deals-mongo";
+import { registerBrokerRoutes } from "../brokers-mongo";
+import { registerChatRoutes } from "../chat-mongo";
+import { registerSalesGoalRoutes } from "../sales-goal-mongo";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 
@@ -61,6 +67,12 @@ async function startServer() {
   registerOAuthRoutes(app);
   registerExcelRoutes(app);
   registerDeviceDataRoutes(app);
+  registerRfpRoutes(app);
+  registerEventRoutes(app);
+  registerDealRoutes(app);
+  registerBrokerRoutes(app);
+  registerChatRoutes(app);
+  registerSalesGoalRoutes(app);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });
@@ -146,6 +158,7 @@ async function startServer() {
   });
 
   server.listen(port, () => {
+    console.log(`[api] server listening on port ${port}`);
     console.log(`[api] server listening on port ${port}`);
     console.log(`[web] dashboard available at http://localhost:${port}/dashboard`);
   });

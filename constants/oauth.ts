@@ -68,7 +68,7 @@ export function getApiBaseUrl(): string {
   }
 
   // Fallback to empty (will use relative URL on web)
-  return "http://192.168.100.180:3000";
+  return "http://172.20.10.3:3000";
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";

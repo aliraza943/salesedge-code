@@ -24,26 +24,25 @@ describe("DataProvider structure", () => {
     expect(source).toContain("export function useData");
   });
 
-  it("uses tRPC mutations for cloud CRUD", () => {
+  it("uses tRPC mutations for cloud CRUD (events, deals, brokers; RFPs use REST API)", () => {
     expect(source).toContain("trpc.events.create.useMutation");
-    expect(source).toContain("trpc.rfps.create.useMutation");
     expect(source).toContain("trpc.deals.create.useMutation");
     expect(source).toContain("trpc.brokers.create.useMutation");
     expect(source).toContain("trpc.salesGoal.upsert.useMutation");
+    expect(source).toContain("rfpApi.createRfp");
   });
 
-  it("uses tRPC queries for cloud data fetching", () => {
+  it("uses tRPC queries for cloud data fetching (RFPs loaded via rfpApi.fetchRfps)", () => {
     expect(source).toContain("trpc.events.list.useQuery");
-    expect(source).toContain("trpc.rfps.list.useQuery");
     expect(source).toContain("trpc.deals.list.useQuery");
     expect(source).toContain("trpc.brokers.list.useQuery");
     expect(source).toContain("trpc.salesGoal.get.useQuery");
     expect(source).toContain("trpc.chat.history.useQuery");
+    expect(source).toContain("rfpApi.fetchRfps");
   });
 
-  it("has local AsyncStorage fallback", () => {
+  it("has local AsyncStorage fallback for events, deals, chat, brokers (RFPs are API-only)", () => {
     expect(source).toContain("EventStore.getAll");
-    expect(source).toContain("RfpStore.getAll");
     expect(source).toContain("DealStore.getAll");
     expect(source).toContain("BrokerStore.getAll");
     expect(source).toContain("ChatStore.getAll");
@@ -61,10 +60,9 @@ describe("DataProvider structure", () => {
 // ─── Test 2: Local store still works as fallback ────────
 
 describe("LocalStore fallback", () => {
-  it("exports all store modules", async () => {
+  it("exports store modules (RFPs are in MongoDB via REST API, not local-store)", async () => {
     const mod = await import("../lib/local-store");
     expect(mod.EventStore).toBeDefined();
-    expect(mod.RfpStore).toBeDefined();
     expect(mod.DealStore).toBeDefined();
     expect(mod.ChatStore).toBeDefined();
     expect(mod.BrokerStore).toBeDefined();
