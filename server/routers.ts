@@ -12,6 +12,7 @@ import {
   buildPublicChatSystemPrompt,
   buildRfpSummarizePrompt,
 } from "./prompt-helpers";
+import { weeklyReportRouter } from "./weekly-report";
 
 function getDayOfWeek(dateStr: string): string {
   const days = [
@@ -863,6 +864,9 @@ export const appRouter = router({
         return results;
       }),
   }),
+
+  // ─── Weekly Report ─────────────────────────────────────
+  weeklyReport: weeklyReportRouter,
 
   // ─── Voice Transcription ───────────────────────────────
   voice: router({

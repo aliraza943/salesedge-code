@@ -147,3 +147,19 @@ export const salesGoals = mysqlTable("sales_goals", {
 
 export type SalesGoal = typeof salesGoals.$inferSelect;
 export type InsertSalesGoal = typeof salesGoals.$inferInsert;
+
+/**
+ * Client page clicks — tracks resource link clicks on client wallet pages
+ */
+export const clientPageClicks = mysqlTable("client_page_clicks", {
+  id: int("id").autoincrement().primaryKey(),
+  clientSlug: varchar("clientSlug", { length: 128 }).notNull(),
+  resourceId: varchar("resourceId", { length: 128 }),
+  resourceTitle: varchar("resourceTitle", { length: 255 }),
+  linkLabel: varchar("linkLabel", { length: 255 }),
+  linkUrl: text("linkUrl"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ClientPageClick = typeof clientPageClicks.$inferSelect;
+export type InsertClientPageClick = typeof clientPageClicks.$inferInsert;
