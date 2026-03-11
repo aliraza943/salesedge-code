@@ -230,7 +230,7 @@ function DatePicker({
 
 export default function RfpsScreen() {
   const colors = useColors();
-  const { rfps, brokers, refreshAll, createRfp, updateRfp: updateRfpData, deleteRfp: deleteRfpData, salesGoal, updateSalesGoal, createEvent, getOrCreateBroker, updateBroker } = useData();
+  const { rfps, brokers, refreshAll, createRfp, updateRfp: updateRfpData, deleteRfp: deleteRfpData, salesGoal, updateSalesGoal, createEvent, getOrCreateBroker, updateBroker, getRfpLabel } = useData();
 
   const [showConsentModal, setShowConsentModal] = useState(false);
   const pendingVoiceTarget = useRef<"create" | "edit" | null>(null);
@@ -327,7 +327,7 @@ export default function RfpsScreen() {
 
   const handleCreate = useCallback(async () => {
     if (!formCase.trim() || !formBroker.trim()) {
-      Alert.alert("Required", "Case name and Brokerage are required.");
+      Alert.alert("Required", `${getRfpLabel("case")} and ${getRfpLabel("brokerage")} are required.`);
       return;
     }
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -777,14 +777,14 @@ export default function RfpsScreen() {
 
         {/* Summary cards */}
         <View style={{ borderRadius: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border, overflow: "hidden" }}>
-          {formCase ? <PreviewRow label="Case" value={formCase} colors={colors} /> : null}
-          {formBroker ? <PreviewRow label="Brokerage" value={formBroker} colors={colors} /> : null}
-          {formBrokerContact ? <PreviewRow label="Brokerage Contact" value={formBrokerContact} colors={colors} /> : null}
-          {formLives ? <PreviewRow label="Lives" value={formLives} colors={colors} /> : null}
-          {formEffectiveDate ? <PreviewRow label="Effective Date" value={formatDate(formEffectiveDate)} colors={colors} /> : null}
-          {formPremium ? <PreviewRow label="Premium" value={formatCurrency(formPremium)} colors={colors} /> : null}
-          {formFollowUpDate ? <PreviewRow label="Follow-Up" value={formatDate(formFollowUpDate)} colors={colors} /> : null}
-          {formNotes ? <PreviewRow label="Notes" value={formNotes} colors={colors} last /> : null}
+          {formCase ? <PreviewRow label={getRfpLabel("case")} value={formCase} colors={colors} /> : null}
+          {formBroker ? <PreviewRow label={getRfpLabel("brokerage")} value={formBroker} colors={colors} /> : null}
+          {formBrokerContact ? <PreviewRow label={getRfpLabel("brokerageContact")} value={formBrokerContact} colors={colors} /> : null}
+          {formLives ? <PreviewRow label={getRfpLabel("lives")} value={formLives} colors={colors} /> : null}
+          {formEffectiveDate ? <PreviewRow label={getRfpLabel("effectiveDate")} value={formatDate(formEffectiveDate)} colors={colors} /> : null}
+          {formPremium ? <PreviewRow label={getRfpLabel("premium")} value={formatCurrency(formPremium)} colors={colors} /> : null}
+          {formFollowUpDate ? <PreviewRow label={getRfpLabel("followUpDate")} value={formatDate(formFollowUpDate)} colors={colors} /> : null}
+          {formNotes ? <PreviewRow label={getRfpLabel("notes")} value={formNotes} colors={colors} last /> : null}
         </View>
       </View>
     );
@@ -811,7 +811,7 @@ export default function RfpsScreen() {
                 {item.title}
               </Text>
               <Text style={{ fontSize: 14, marginTop: 2, color: colors.muted }} numberOfLines={1}>
-                Brokerage: {item.client}
+                {getRfpLabel("brokerage")}: {item.client}
               </Text>
             </View>
             <View style={{ borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: statusColor + "20" }}>
@@ -824,7 +824,7 @@ export default function RfpsScreen() {
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <View style={{ flexDirection: "row", gap: 12 }}>
               {item.lives != null && (
-                <Text style={{ fontSize: 13, color: colors.muted }}>{item.lives} lives</Text>
+                <Text style={{ fontSize: 13, color: colors.muted }}>{item.lives} {getRfpLabel("lives")}</Text>
               )}
               {item.effectiveDate && (
                 <Text style={{ fontSize: 13, color: colors.muted }}>Eff: {formatDate(item.effectiveDate)}</Text>
@@ -868,7 +868,7 @@ export default function RfpsScreen() {
         </Pressable>
       );
     },
-    [colors, movingRfpId, handleMoveToNextStage]
+    [colors, movingRfpId, handleMoveToNextStage, getRfpLabel]
   );
 
   // Section header
@@ -1020,17 +1020,17 @@ export default function RfpsScreen() {
                     </Text>
                     <View style={{ borderRadius: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: isRecording ? colors.error + "40" : colors.border, overflow: "hidden" }}>
                       {[
-                        { label: "Case", example: "ABC Corporation", icon: "doc.text.fill" as const },
-                        { label: "Brokerage", example: "Smith & Associates", icon: "person.fill" as const },
-                        { label: "Brokerage Contact", example: "John Smith", icon: "person.2.fill" as const },
-                        { label: "Lives", example: "250", icon: "person.2.fill" as const },
-                        { label: "Effective Date", example: "March 1st", icon: "calendar" as const },
-                        { label: "Premium", example: "150 thousand", icon: "dollarsign.circle.fill" as const },
-                        { label: "Follow Up", example: "next Tuesday", icon: "bell.fill" as const },
-                        { label: "Notes", example: "any details", icon: "pencil" as const },
+                        { key: "case" as const, example: "ABC Corporation", icon: "doc.text.fill" as const },
+                        { key: "brokerage" as const, example: "Smith & Associates", icon: "person.fill" as const },
+                        { key: "brokerageContact" as const, example: "John Smith", icon: "person.2.fill" as const },
+                        { key: "lives" as const, example: "250", icon: "person.2.fill" as const },
+                        { key: "effectiveDate" as const, example: "March 1st", icon: "calendar" as const },
+                        { key: "premium" as const, example: "150 thousand", icon: "dollarsign.circle.fill" as const },
+                        { key: "followUpDate" as const, example: "next Tuesday", icon: "bell.fill" as const },
+                        { key: "notes" as const, example: "any details", icon: "pencil" as const },
                       ].map((field, idx) => (
                         <View
-                          key={field.label}
+                          key={field.key}
                           style={{
                             flexDirection: "row",
                             alignItems: "center",
@@ -1042,7 +1042,7 @@ export default function RfpsScreen() {
                           }}
                         >
                           <IconSymbol name={field.icon} size={16} color={isRecording ? colors.error : colors.primary} />
-                          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, width: 110 }}>{field.label}</Text>
+                          <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, width: 110 }}>{getRfpLabel(field.key)}</Text>
                           <Text style={{ fontSize: 13, color: colors.muted, flex: 1, fontStyle: "italic" }}>"{field.example}"</Text>
                         </View>
                       ))}
@@ -1065,14 +1065,14 @@ export default function RfpsScreen() {
 
               {/* Editable fields — always visible so user can manually enter/edit any field */}
               <View>
-                {renderFormField("Case *", formCase, setFormCase, "e.g., ABC Corporation Group Benefits")}
-                {renderFormField("Brokerage *", formBroker, setFormBroker, "e.g., Smith & Associates")}
-                {renderContactField("Brokerage Contact", formBrokerContact, setFormBrokerContact, "e.g., John Smith", showContactSuggestions, setShowContactSuggestions)}
-                {renderFormField("Lives", formLives, setFormLives, "e.g., 250", { keyboardType: "numeric" })}
-                {renderDateField("Effective Date", formEffectiveDate, setFormEffectiveDate, showCreateDatePicker, setShowCreateDatePicker)}
-                {renderFormField("Premium ($)", formPremium, setFormPremium, "e.g., 150000", { keyboardType: "numeric" })}
-                {renderDateField("Follow-Up Date", formFollowUpDate, setFormFollowUpDate, showCreateFollowUpPicker, setShowCreateFollowUpPicker)}
-                {renderFormField("Notes", formNotes, setFormNotes, "Any additional notes or details...", { multiline: true })}
+                {renderFormField(`${getRfpLabel("case")} *`, formCase, setFormCase, "e.g., ABC Corporation Group Benefits")}
+                {renderFormField(`${getRfpLabel("brokerage")} *`, formBroker, setFormBroker, "e.g., Smith & Associates")}
+                {renderContactField(getRfpLabel("brokerageContact"), formBrokerContact, setFormBrokerContact, "e.g., John Smith", showContactSuggestions, setShowContactSuggestions)}
+                {renderFormField(getRfpLabel("lives"), formLives, setFormLives, "e.g., 250", { keyboardType: "numeric" })}
+                {renderDateField(getRfpLabel("effectiveDate"), formEffectiveDate, setFormEffectiveDate, showCreateDatePicker, setShowCreateDatePicker)}
+                {renderFormField(getRfpLabel("premium"), formPremium, setFormPremium, "e.g., 150000", { keyboardType: "numeric" })}
+                {renderDateField(getRfpLabel("followUpDate"), formFollowUpDate, setFormFollowUpDate, showCreateFollowUpPicker, setShowCreateFollowUpPicker)}
+                {renderFormField(getRfpLabel("notes"), formNotes, setFormNotes, "Any additional notes or details...", { multiline: true })}
               </View>
 
               {/* Re-record button */}
@@ -1133,16 +1133,16 @@ export default function RfpsScreen() {
                 </View>
 
                 <View style={{ borderRadius: 12, padding: 14, marginBottom: 16, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border }}>
-                  <DetailRow label="Brokerage" value={detailRfp.client} colors={colors} />
-                  <DetailRow label="Brokerage Contact" value={detailRfp.brokerContact || "—"} colors={colors} />
-                  <DetailRow label="Lives" value={detailRfp.lives != null ? String(detailRfp.lives) : "—"} colors={colors} />
-                  <DetailRow label="Effective Date" value={formatDate(detailRfp.effectiveDate)} colors={colors} />
-                  <DetailRow label="Premium" value={formatCurrency(detailRfp.premium)} colors={colors} last />
+                  <DetailRow label={getRfpLabel("brokerage")} value={detailRfp.client} colors={colors} />
+                  <DetailRow label={getRfpLabel("brokerageContact")} value={detailRfp.brokerContact || "—"} colors={colors} />
+                  <DetailRow label={getRfpLabel("lives")} value={detailRfp.lives != null ? String(detailRfp.lives) : "—"} colors={colors} />
+                  <DetailRow label={getRfpLabel("effectiveDate")} value={formatDate(detailRfp.effectiveDate)} colors={colors} />
+                  <DetailRow label={getRfpLabel("premium")} value={formatCurrency(detailRfp.premium)} colors={colors} last />
                 </View>
 
                 {/* Follow-Up Date */}
                 <View style={{ marginBottom: 16 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>Follow-Up</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>{getRfpLabel("followUpDate")}</Text>
                   {detailRfp.followUpDate ? (
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                       <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: colors.primary + "10", borderColor: colors.primary + "30", flex: 1, flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1203,7 +1203,7 @@ export default function RfpsScreen() {
 
                 {detailRfp.notes && (
                   <View style={{ marginBottom: 16 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>Notes</Text>
+                    <Text style={{ fontSize: 13, fontWeight: "500", marginBottom: 6, color: colors.muted }}>{getRfpLabel("notes")}</Text>
                     <View style={{ borderRadius: 12, padding: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: colors.border }}>
                       <Text style={{ fontSize: 15, lineHeight: 22, color: colors.foreground }}>{detailRfp.notes}</Text>
                     </View>
@@ -1321,14 +1321,14 @@ export default function RfpsScreen() {
                   ))}
                 </ScrollView>
 
-                {renderFormField("Case", editCase, setEditCase, "Case name")}
-                {renderFormField("Brokerage", editBroker, setEditBroker, "Brokerage name")}
-                {renderContactField("Brokerage Contact", editBrokerContact, setEditBrokerContact, "Contact person", showEditContactSuggestions, setShowEditContactSuggestions)}
-                {renderFormField("Lives", editLives, setEditLives, "Number of lives", { keyboardType: "numeric" })}
-                {renderDateField("Effective Date", editEffectiveDate, setEditEffectiveDate, showEditDatePicker, setShowEditDatePicker)}
-                {renderFormField("Premium ($)", editPremium, setEditPremium, "Premium amount", { keyboardType: "numeric" })}
-                {renderDateField("Follow-Up Date", editFollowUpDate, setEditFollowUpDate, showEditFollowUpPicker, setShowEditFollowUpPicker)}
-                {renderFormField("Notes", editNotes, setEditNotes, "Notes...", { multiline: true })}
+                {renderFormField(getRfpLabel("case"), editCase, setEditCase, "Case name")}
+                {renderFormField(getRfpLabel("brokerage"), editBroker, setEditBroker, "Brokerage name")}
+                {renderContactField(getRfpLabel("brokerageContact"), editBrokerContact, setEditBrokerContact, "Contact person", showEditContactSuggestions, setShowEditContactSuggestions)}
+                {renderFormField(getRfpLabel("lives"), editLives, setEditLives, `Number of ${getRfpLabel("lives").toLowerCase()}`, { keyboardType: "numeric" })}
+                {renderDateField(getRfpLabel("effectiveDate"), editEffectiveDate, setEditEffectiveDate, showEditDatePicker, setShowEditDatePicker)}
+                {renderFormField(getRfpLabel("premium"), editPremium, setEditPremium, "Premium amount", { keyboardType: "numeric" })}
+                {renderDateField(getRfpLabel("followUpDate"), editFollowUpDate, setEditFollowUpDate, showEditFollowUpPicker, setShowEditFollowUpPicker)}
+                {renderFormField(getRfpLabel("notes"), editNotes, setEditNotes, "Notes...", { multiline: true })}
                 <View style={{ height: 40 }} />
               </ScrollView>
             </KeyboardAvoidingView>

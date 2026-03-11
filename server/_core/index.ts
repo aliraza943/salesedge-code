@@ -14,6 +14,7 @@ import { registerDealRoutes } from "../deals-mongo";
 import { registerBrokerRoutes } from "../brokers-mongo";
 import { registerChatRoutes } from "../chat-mongo";
 import { registerSalesGoalRoutes } from "../sales-goal-mongo";
+import { registerRfpFieldLabelsRoutes } from "../rfp-field-labels-mongo";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 
@@ -73,6 +74,7 @@ async function startServer() {
   registerBrokerRoutes(app);
   registerChatRoutes(app);
   registerSalesGoalRoutes(app);
+  registerRfpFieldLabelsRoutes(app);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, timestamp: Date.now() });

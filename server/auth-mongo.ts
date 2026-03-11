@@ -235,6 +235,7 @@ export async function deleteAccount(req: Request, res: Response): Promise<void> 
     await db.collection("brokers").deleteMany({ userId });
     await db.collection("chatMessages").deleteMany({ userId });
     await db.collection("salesGoal").deleteOne({ _id: userId });
+    await db.collection("rfp_field_labels").deleteOne({ _id: userId });
     await db.collection(COLLECTION_USERS).deleteOne({ _id: oid });
 
     res.json({ ok: true });

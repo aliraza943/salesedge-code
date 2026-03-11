@@ -19,7 +19,7 @@ export default function HomeScreen() {
   const colors = useColors();
   const router = useRouter();
   const { user } = useAuth({ autoFetch: true });
-  const { events, rfps, deals, isLoading, refreshAll, salesGoal, updateSalesGoal, isCloudMode, isSyncing, syncLocalToCloud } = useData();
+  const { events, rfps, deals, isLoading, refreshAll, salesGoal, updateSalesGoal, isCloudMode, isSyncing, syncLocalToCloud, rfpFieldLabels } = useData();
   const [exporting, setExporting] = useState<string | null>(null);
   const [showEditGoal, setShowEditGoal] = useState(false);
   const [editCurrentSales, setEditCurrentSales] = useState("");
@@ -138,7 +138,10 @@ export default function HomeScreen() {
     try {
       const baseUrl = getApiBaseUrl();
       const endpoint = type === "rfps" ? "/api/export/rfps" : "/api/export/schedule";
-      const body = type === "rfps" ? { rfps } : { events };
+      const body =
+        type === "rfps"
+          ? { rfps, labels: rfpFieldLabels }
+          : { events };
       const res = await fetch(`${baseUrl}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -157,7 +160,7 @@ export default function HomeScreen() {
     } finally {
       setExporting(null);
     }
-  }, [rfps, events]);
+  }, [rfps, events, rfpFieldLabels]);
 
   const haptic = () => {
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

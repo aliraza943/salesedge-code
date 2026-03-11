@@ -105,6 +105,17 @@ export default function ProfileScreen() {
           </Text>
         </View>
 
+        <Pressable
+          onPress={() => router.push("/rfp-labels-settings")}
+          className="rounded-xl py-3.5 flex-row items-center justify-between mb-4 px-4"
+          style={{ backgroundColor: colors.border }}
+        >
+          <Text className="text-base font-medium" style={{ color: colors.foreground }}>
+            Customize RFP field labels
+          </Text>
+          <IconSymbol name="chevron.right" size={18} color={colors.muted} />
+        </Pressable>
+
         <View className="rounded-2xl overflow-hidden mb-6" style={{ backgroundColor: colors.surface }}>
           <View className="p-4 border-b" style={{ borderBottomColor: colors.border }}>
             <Text className="text-xs font-medium mb-1" style={{ color: colors.muted }}>

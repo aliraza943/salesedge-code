@@ -81,24 +81,53 @@ function formatCurrency(val?: string): string {
   return "$" + num.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+// Default RFP column headers (match app defaults); client can send customized labels.
+const DEFAULT_RFP_HEADERS: Record<string, string> = {
+  case: "Case",
+  brokerage: "Brokerage",
+  brokerageContact: "Brokerage Contact",
+  lives: "Lives",
+  effectiveDate: "Effective Date",
+  premium: "Premium ($)",
+  notes: "Notes",
+};
+
+function getRfpHeader(labels: Record<string, string> | undefined, key: string): string {
+  if (labels && typeof labels[key] === "string" && labels[key].trim() !== "") {
+    return labels[key].trim();
+  }
+  return DEFAULT_RFP_HEADERS[key] ?? key;
+}
+
 // ─── Build RFP workbook ──────────────────────────────────────────────
-async function buildRfpWorkbook(rfps: any[]): Promise<ExcelJS.Workbook> {
+async function buildRfpWorkbook(
+  rfps: any[],
+  labels?: Record<string, string>
+): Promise<ExcelJS.Workbook> {
   const wb = new ExcelJS.Workbook();
   wb.creator = "SalesEdge";
   wb.created = new Date();
+
+  const caseH = getRfpHeader(labels, "case");
+  const brokerageH = getRfpHeader(labels, "brokerage");
+  const contactH = getRfpHeader(labels, "brokerageContact");
+  const livesH = getRfpHeader(labels, "lives");
+  const effectiveDateH = getRfpHeader(labels, "effectiveDate");
+  const premiumH = getRfpHeader(labels, "premium");
+  const notesH = getRfpHeader(labels, "notes");
 
   // Active RFPs sheet (draft + recommended)
   const activeRfps = rfps.filter((r: any) => r.status !== "sold");
   const activeSheet = wb.addWorksheet("Active RFPs");
   activeSheet.columns = [
-    { header: "Case", key: "case", width: 28 },
-    { header: "Broker", key: "broker", width: 22 },
-    { header: "Broker Contact", key: "brokerContact", width: 22 },
-    { header: "Lives", key: "lives", width: 12 },
-    { header: "Effective Date", key: "effectiveDate", width: 18 },
-    { header: "Premium", key: "premium", width: 18 },
+    { header: caseH, key: "case", width: 28 },
+    { header: brokerageH, key: "broker", width: 22 },
+    { header: contactH, key: "brokerContact", width: 22 },
+    { header: livesH, key: "lives", width: 12 },
+    { header: effectiveDateH, key: "effectiveDate", width: 18 },
+    { header: premiumH, key: "premium", width: 18 },
     { header: "Status", key: "status", width: 16 },
-    { header: "Notes", key: "notes", width: 35 },
+    { header: notesH, key: "notes", width: 35 },
   ];
   styleHeader(activeSheet.getRow(1));
 
@@ -120,13 +149,13 @@ async function buildRfpWorkbook(rfps: any[]): Promise<ExcelJS.Workbook> {
   const soldRfps = rfps.filter((r: any) => r.status === "sold");
   const soldSheet = wb.addWorksheet("Sold Cases");
   soldSheet.columns = [
-    { header: "Case", key: "case", width: 28 },
-    { header: "Broker", key: "broker", width: 22 },
-    { header: "Broker Contact", key: "brokerContact", width: 22 },
-    { header: "Lives", key: "lives", width: 12 },
-    { header: "Effective Date", key: "effectiveDate", width: 18 },
-    { header: "Premium", key: "premium", width: 18 },
-    { header: "Notes", key: "notes", width: 35 },
+    { header: caseH, key: "case", width: 28 },
+    { header: brokerageH, key: "broker", width: 22 },
+    { header: contactH, key: "brokerContact", width: 22 },
+    { header: livesH, key: "lives", width: 12 },
+    { header: effectiveDateH, key: "effectiveDate", width: 18 },
+    { header: premiumH, key: "premium", width: 18 },
+    { header: notesH, key: "notes", width: 35 },
   ];
   styleHeader(soldSheet.getRow(1));
 
@@ -196,16 +225,18 @@ async function buildScheduleWorkbook(events: any[]): Promise<ExcelJS.Workbook> {
 
 // ─── Register routes ─────────────────────────────────────────────────
 export function registerExcelRoutes(app: Express) {
-  // Export RFPs + Sold cases
+  // Export RFPs + Sold cases (optional labels = user-customized column headers)
   app.post("/api/export/rfps", async (req: Request, res: Response) => {
     try {
-      const { rfps } = req.body;
+      const { rfps, labels } = req.body;
       if (!Array.isArray(rfps)) {
         res.status(400).json({ error: "Missing rfps array" });
         return;
       }
+      const headerLabels =
+        labels && typeof labels === "object" && !Array.isArray(labels) ? labels : undefined;
 
-      const wb = await buildRfpWorkbook(rfps);
+      const wb = await buildRfpWorkbook(rfps, headerLabels);
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
       const filename = `SalesEdge_RFPs_${new Date().toISOString().slice(0, 10)}.xlsx`;
 

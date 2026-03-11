@@ -100,6 +100,7 @@ export default function RootLayout() {
                 <Stack.Screen name="sign-up" />
                 <Stack.Screen name="(tabs)" />
                 <Stack.Screen name="profile" options={{ presentation: "card" }} />
+                <Stack.Screen name="rfp-labels-settings" options={{ presentation: "card" }} />
                 <Stack.Screen name="weekly-summary" options={{ presentation: "card" }} />
               </Stack>
             </DataProvider>

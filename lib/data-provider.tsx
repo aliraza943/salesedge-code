@@ -10,6 +10,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -27,12 +28,17 @@ import * as dealsApi from "@/lib/deals-api";
 import * as brokersApi from "@/lib/brokers-api";
 import * as chatApi from "@/lib/chat-api";
 import * as salesGoalApi from "@/lib/sales-goal-api";
+import * as rfpLabelsApi from "@/lib/rfp-labels-api";
 import {
   scheduleEventReminder,
   cancelEventReminder,
   requestNotificationPermissions,
 } from "@/lib/notification-manager";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  getEffectiveRfpLabels,
+  type RfpFieldLabelKey,
+} from "@/constants/rfp-field-labels";
 
 // ─── Types ─────────────────────────────────────────────
 
@@ -117,6 +123,11 @@ type DataContextType = {
   refreshAll: () => Promise<void>;
   syncLocalToCloud: () => Promise<{ events: number; rfps: number; deals: number; brokers: number; salesGoal: boolean } | null>;
   isSyncing: boolean;
+
+  rfpFieldLabels: Record<RfpFieldLabelKey, string>;
+  rfpFieldLabelOverrides: Partial<Record<RfpFieldLabelKey, string>>;
+  updateRfpFieldLabels: (overrides: Partial<Record<RfpFieldLabelKey, string>>) => Promise<void>;
+  getRfpLabel: (key: RfpFieldLabelKey) => string;
 };
 
 const DataContext = createContext<DataContextType | null>(null);
@@ -141,6 +152,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [salesGoal, setSalesGoal] = useState<SalesGoal>(DEFAULT_SALES_GOAL);
+  const [rfpFieldLabelOverrides, setRfpFieldLabelOverrides] = useState<Partial<Record<RfpFieldLabelKey, string>>>({});
 
   const eventsRef = useRef(events);
   eventsRef.current = events;
@@ -165,13 +177,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
     (async () => {
       try {
-        const [eventsList, rfpsList, dealsList, brokersList, chatList, goal] = await Promise.all([
+        const [eventsList, rfpsList, dealsList, brokersList, chatList, goal, rfpLabelsList] = await Promise.all([
           eventsApi.fetchEvents(),
           rfpApi.fetchRfps(),
           dealsApi.fetchDeals(),
           brokersApi.fetchBrokers(),
           chatApi.fetchChatMessages(),
           salesGoalApi.fetchSalesGoal().catch(() => DEFAULT_SALES_GOAL),
+          rfpLabelsApi.fetchRfpFieldLabels().catch(() => ({})),
         ]);
         setEvents(eventsList);
         setRfps(rfpsList);
@@ -179,6 +192,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setBrokers(brokersList);
         setChatMessages(chatList);
         setSalesGoal(goal);
+        setRfpFieldLabelOverrides(rfpLabelsList);
       } catch (e) {
         console.error("[DataProvider] Initial load failed:", e);
       } finally {
@@ -414,13 +428,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const refreshAll = useCallback(async () => {
     if (!isCloudMode) return;
     try {
-      const [eventsList, rfpsList, dealsList, brokersList, chatList, goal] = await Promise.all([
+      const [eventsList, rfpsList, dealsList, brokersList, chatList, goal, rfpLabelsList] = await Promise.all([
         eventsApi.fetchEvents(),
         rfpApi.fetchRfps(),
         dealsApi.fetchDeals(),
         brokersApi.fetchBrokers(),
         chatApi.fetchChatMessages(),
         salesGoalApi.fetchSalesGoal().catch(() => DEFAULT_SALES_GOAL),
+        rfpLabelsApi.fetchRfpFieldLabels().catch(() => ({})),
       ]);
       setEvents(eventsList);
       setRfps(rfpsList);
@@ -428,10 +443,29 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setBrokers(brokersList);
       setChatMessages(chatList);
       setSalesGoal(goal);
+      setRfpFieldLabelOverrides(rfpLabelsList);
     } catch (e) {
       console.error("[DataProvider] refreshAll failed:", e);
     }
   }, [isCloudMode]);
+
+  const rfpFieldLabels = useMemo(
+    () => getEffectiveRfpLabels(rfpFieldLabelOverrides),
+    [rfpFieldLabelOverrides]
+  );
+
+  const updateRfpFieldLabels = useCallback(
+    async (overrides: Partial<Record<RfpFieldLabelKey, string>>) => {
+      const updated = await rfpLabelsApi.updateRfpFieldLabels(overrides);
+      setRfpFieldLabelOverrides(updated);
+    },
+    []
+  );
+
+  const getRfpLabel = useCallback(
+    (key: RfpFieldLabelKey) => rfpFieldLabels[key],
+    [rfpFieldLabels]
+  );
 
   return (
     <DataContext.Provider
@@ -466,6 +500,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         refreshAll,
         syncLocalToCloud,
         isSyncing,
+        rfpFieldLabels,
+        rfpFieldLabelOverrides,
+        updateRfpFieldLabels,
+        getRfpLabel,
       }}
     >
       {children}
