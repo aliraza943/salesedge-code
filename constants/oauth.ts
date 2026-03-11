@@ -1,6 +1,7 @@
 import * as Linking from "expo-linking";
 import * as ReactNative from "react-native";
 import Constants from "expo-constants";
+import * as Network from "expo-network";
 
 // Read OAuth config from app.config.ts extra field
 // These values are resolved at config-load time (after load-env.js runs),
@@ -24,10 +25,17 @@ export const OWNER_OPEN_ID = env.ownerId;
 export const OWNER_NAME = env.ownerName;
 export const API_BASE_URL = env.apiBaseUrl;
 
+/** Default API port when deriving from IP (e.g. prebuild with no debuggerHost). */
+const DEFAULT_API_PORT = 3000;
+
+/** Cached base URL when resolved via getApiBaseUrlAsync() in prebuild/native fallback. */
+let cachedFallbackBaseUrl: string | null = null;
+
 /**
  * Get the API base URL, deriving from current hostname if not set.
  * Metro runs on 8081, API server runs on 3000.
  * URL pattern: https://PORT-sandboxid.region.domain
+ * On native prebuild (no debuggerHost), returns cached value from getApiBaseUrlAsync() or "" until resolved.
  */
 export function getApiBaseUrl(): string {
   // If API_BASE_URL is explicitly set, use it
@@ -63,12 +71,44 @@ export function getApiBaseUrl(): string {
       }
       // Case 2: Local network IP like "192.168.1.5:8081"
       const [ip] = debuggerHost.split(":");
-      return `http://${ip}:3000`;
+      return `http://${ip}:${DEFAULT_API_PORT}`;
+    }
+
+    // Prebuild: no debuggerHost — use cached URL from getApiBaseUrlAsync() if already resolved
+    if (cachedFallbackBaseUrl) {
+      return cachedFallbackBaseUrl;
     }
   }
 
-  // Fallback to empty (will use relative URL on web)
-  return "http://192.168.100.180:3000";
+  // Fallback to empty (will use relative URL on web, or until getApiBaseUrlAsync() resolves on native)
+  return "";
+}
+
+/**
+ * Resolve the API base URL asynchronously when running a prebuild (no Metro debuggerHost):
+ * uses the device's local IP from expo-network and caches it for getApiBaseUrl().
+ * Call this early (e.g. in root layout) so subsequent getApiBaseUrl() calls return the URL.
+ */
+export async function getApiBaseUrlAsync(): Promise<string> {
+  const sync = getApiBaseUrl();
+  if (sync) return sync;
+  if (cachedFallbackBaseUrl) return cachedFallbackBaseUrl;
+
+  if (ReactNative.Platform.OS === "web") return "";
+
+  let ip: string | null = null;
+  try {
+    ip = await Network.getIpAddressAsync();
+  } catch {
+    // ignore
+  }
+console.log("hehehhehehehh",ip)
+  if (ip && /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) {
+    cachedFallbackBaseUrl = `http://${ip}:${DEFAULT_API_PORT}`;
+    return cachedFallbackBaseUrl;
+  }
+
+  return "";
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";

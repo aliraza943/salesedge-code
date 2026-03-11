@@ -54,8 +54,9 @@ runtimeVersion: {
   policy: "appVersion"
 },
   ios: {
-    supportsTablet: false,
+    supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
+      buildNumber: "16",
     "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }

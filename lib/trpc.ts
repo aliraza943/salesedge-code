@@ -18,6 +18,8 @@ export const trpc = createTRPCReact<AppRouter>();
  * Creates the tRPC client with proper configuration.
  * Call this once in your app's root layout.
  */
+    console.log("getApiBaseUrl()",getApiBaseUrl())
+
 export function createTRPCClient() {
   return trpc.createClient({
     links: [

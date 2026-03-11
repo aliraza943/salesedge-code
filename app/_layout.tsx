@@ -1,5 +1,6 @@
 import "@/global.css";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import * as SplashScreen from "expo-splash-screen";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -16,6 +17,7 @@ import {
 } from "react-native-safe-area-context";
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
+import { getApiBaseUrl, getApiBaseUrlAsync } from "@/constants/oauth";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { DataProvider } from "@/lib/data-provider";
 import { configureNotifications } from "@/lib/notification-manager";
@@ -28,12 +30,27 @@ export const unstable_settings = {
   anchor: "(tabs)",
 };
 
+// Keep native splash visible until we explicitly hide it (avoids blank screen or stuck splash)
+if (Platform.OS !== "web") {
+  SplashScreen.preventAutoHideAsync();
+}
+
+const needsAsyncBaseUrl = Platform.OS !== "web" && !getApiBaseUrl();
+
 export default function RootLayout() {
   const initialInsets = initialWindowMetrics?.insets ?? DEFAULT_WEB_INSETS;
   const initialFrame = initialWindowMetrics?.frame ?? DEFAULT_WEB_FRAME;
 
   const [insets, setInsets] = useState<EdgeInsets>(initialInsets);
   const [frame, setFrame] = useState<Rect>(initialFrame);
+  const [baseUrlResolved, setBaseUrlResolved] = useState(!needsAsyncBaseUrl);
+
+  // Create tRPC client once when base URL is available (immediate on web/Expo Go, after getApiBaseUrlAsync() on prebuild)
+  const trpcClient = useMemo(() => {
+    if (!baseUrlResolved) return null;
+    if (needsAsyncBaseUrl && !getApiBaseUrl()) return null;
+    return createTRPCClient();
+  }, [baseUrlResolved]);
 
   useEffect(() => {
     initManusRuntime();
@@ -41,6 +58,23 @@ export default function RootLayout() {
       configureNotifications();
     }
   }, []);
+
+  // Prebuild (no debuggerHost): resolve API base URL from device IP, then set flag so useMemo creates client
+  useEffect(() => {
+    if (!needsAsyncBaseUrl) return;
+    getApiBaseUrlAsync().then(() => setBaseUrlResolved(true));
+  }, []);
+
+  // Hide splash only when we're about to show content (have a client), or after 8s safety
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (trpcClient != null) {
+      SplashScreen.hideAsync().catch(() => {});
+      return;
+    }
+    const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 8000);
+    return () => clearTimeout(t);
+  }, [trpcClient]);
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
@@ -64,7 +98,6 @@ export default function RootLayout() {
         },
       }),
   );
-  const [trpcClient] = useState(() => createTRPCClient());
 
   const providerInitialMetrics = useMemo(() => {
     const metrics = initialWindowMetrics ?? { insets: initialInsets, frame: initialFrame };
@@ -77,6 +110,10 @@ export default function RootLayout() {
       },
     };
   }, [initialInsets, initialFrame]);
+
+  if (trpcClient == null) {
+    return null;
+  }
 
   const content = (
     <GestureHandlerRootView style={{ flex: 1 }}>

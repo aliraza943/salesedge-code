@@ -329,17 +329,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     }
   }, [isCloudMode]);
 
-  // Sync cloud data into state when queries resolve
+  // Sync cloud data into state when queries resolve; hide loading once all have settled (success or error)
   useEffect(() => {
     if (!isCloudMode) return;
 
-    const allLoaded =
-      eventsQuery.data !== undefined &&
-      rfpsQuery.data !== undefined &&
-      dealsQuery.data !== undefined &&
-      brokersQuery.data !== undefined;
+    const allSettled =
+      eventsQuery.isFetched &&
+      rfpsQuery.isFetched &&
+      dealsQuery.isFetched &&
+      brokersQuery.isFetched;
 
-    if (allLoaded) {
+    if (allSettled) {
       setEvents((eventsQuery.data || []).map(cloudEventToLocal));
       setRfps((rfpsQuery.data || []).map(cloudRfpToLocal));
       setDeals((dealsQuery.data || []).map(cloudDealToLocal));
@@ -349,10 +349,21 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   }, [
     isCloudMode,
     eventsQuery.data,
+    eventsQuery.isFetched,
     rfpsQuery.data,
+    rfpsQuery.isFetched,
     dealsQuery.data,
+    dealsQuery.isFetched,
     brokersQuery.data,
+    brokersQuery.isFetched,
   ]);
+
+  // Safety: if cloud queries never settle (e.g. network down during review), stop showing loading after 15s
+  useEffect(() => {
+    if (!isCloudMode) return;
+    const t = setTimeout(() => setIsLoading(false), 15000);
+    return () => clearTimeout(t);
+  }, [isCloudMode]);
 
   useEffect(() => {
     if (isCloudMode && salesGoalQuery.data) {
