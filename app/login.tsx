@@ -104,7 +104,7 @@ export default function LoginScreen() {
             autoCorrect={false}
             keyboardType="email-address"
             editable={!loading}
-            className="rounded-xl border px-4 py-3 text-base mb-4"
+            className="rounded-xl border px-4 py-3 mb-4"
             style={{
               borderColor: colors.border,
               color: colors.foreground,

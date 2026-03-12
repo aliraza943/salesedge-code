@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Alert,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
@@ -130,6 +131,7 @@ export default function CalendarScreen() {
     formatDate(today.getFullYear(), today.getMonth(), today.getDate())
   );
   const [showAddModal, setShowAddModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editingEvent, setEditingEvent] = useState<LocalEvent | null>(null);
   const [formTitle, setFormTitle] = useState("");
   const [formDescription, setFormDescription] = useState("");
@@ -246,30 +248,38 @@ export default function CalendarScreen() {
       return;
     }
     setFormErrors({});
-    let eventId: string;
+    setIsSaving(true);
 
-    if (editingEvent) {
-      await updateEventData(editingEvent.id, {
-        title,
-        description: formDescription.trim() || undefined,
-        startTime: time || undefined,
-        reminderMinutes: formReminder > 0 ? formReminder : undefined,
-      });
-      eventId = editingEvent.id;
-    } else {
-      const newEvent = await createEventData({
-        title,
-        description: formDescription.trim() || undefined,
-        date: selectedDate,
-        startTime: time || undefined,
-        reminderMinutes: formReminder > 0 ? formReminder : undefined,
-      });
-      eventId = newEvent.id;
+    try {
+      let eventId: string;
+
+      if (editingEvent) {
+        await updateEventData(editingEvent.id, {
+          title,
+          description: formDescription.trim() || undefined,
+          startTime: time || undefined,
+          reminderMinutes: formReminder > 0 ? formReminder : undefined,
+        });
+        eventId = editingEvent.id;
+      } else {
+        const newEvent = await createEventData({
+          title,
+          description: formDescription.trim() || undefined,
+          date: selectedDate,
+          startTime: time || undefined,
+          reminderMinutes: formReminder > 0 ? formReminder : undefined,
+        });
+        eventId = newEvent.id;
+      }
+
+      await refreshAll();
+      setShowAddModal(false);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (err) {
+      Alert.alert("Error", "Failed to save event. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
-
-    await refreshAll();
-    setShowAddModal(false);
-    if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleDeleteEvent = (id: string) => {
@@ -513,8 +523,9 @@ export default function CalendarScreen() {
                 <TouchableOpacity
                   onPress={() => setShowAddModal(false)}
                   activeOpacity={0.6}
+                  disabled={isSaving}
                 >
-                  <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
+                  <Text className="text-base" style={{ color: isSaving ? colors.muted + "80" : colors.muted }}>Cancel</Text>
                 </TouchableOpacity>
                 <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
                   {editingEvent ? "Edit Event" : "New Event"}
@@ -522,8 +533,14 @@ export default function CalendarScreen() {
                 <TouchableOpacity
                   onPress={handleSave}
                   activeOpacity={0.6}
+                  disabled={isSaving}
+                  style={{ minWidth: 44, alignItems: "flex-end" }}
                 >
-                  <Text className="text-base font-semibold" style={{ color: colors.primary }}>Save</Text>
+                  {isSaving ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Text className="text-base font-semibold" style={{ color: colors.primary }}>Save</Text>
+                  )}
                 </TouchableOpacity>
               </View>
 

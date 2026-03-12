@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   StyleSheet,
+  KeyboardAvoidingView,
 } from "react-native";
 
 import { ScreenContainer } from "@/components/screen-container";
@@ -80,101 +81,105 @@ export default function RfpLabelsSettingsScreen() {
 
   return (
     <ScreenContainer className="flex-1" edges={["top", "bottom", "left", "right"]}>
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.header}>
-          <Pressable
-            onPress={() => router.back()}
-            style={[styles.backButton, { backgroundColor: colors.surface }]}
-          >
-            <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
-          </Pressable>
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            RFP Field Labels
-          </Text>
-        </View>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
 
-        <Text style={[styles.subtitle, { color: colors.muted }]}>
-          Customize the labels shown on RFP forms. Data and database keys stay the same; only the display text changes. Leave a field as default or enter your own (e.g. "Members" instead of "Lives").
-        </Text>
-
-        {!loaded ? (
-          <View style={styles.loading}>
-            <ActivityIndicator size="small" color={colors.primary} />
+        <ScrollView
+          className="flex-1"
+          contentContainerStyle={{ padding: 24, paddingBottom: 48 }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => router.back()}
+              style={[styles.backButton, { backgroundColor: colors.surface }]}
+            >
+              <IconSymbol name="chevron.left" size={22} color={colors.foreground} />
+            </Pressable>
+            <Text style={[styles.title, { color: colors.foreground }]}>
+              RFP Field Labels
+            </Text>
           </View>
-        ) : (
-          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            {RFP_FIELD_LABEL_KEYS.map((key, index) => (
-              <View
-                key={key}
-                style={[
-                  styles.row,
-                  index < RFP_FIELD_LABEL_KEYS.length - 1 && {
-                    borderBottomWidth: StyleSheet.hairlineWidth,
-                    borderBottomColor: colors.border,
-                  },
-                ]}
-              >
-                <Text style={[styles.keyLabel, { color: colors.muted }]} numberOfLines={1}>
-                  {key}
-                </Text>
-                <TextInput
-                  value={values[key]}
-                  onChangeText={(text) => handleChange(key, text)}
-                  placeholder={DEFAULT_RFP_FIELD_LABELS[key]}
-                  placeholderTextColor={colors.muted}
+
+          <Text style={[styles.subtitle, { color: colors.muted }]}>
+            Customize the labels shown on RFP forms. Data and database keys stay the same; only the display text changes. Leave a field as default or enter your own (e.g. "Members" instead of "Lives").
+          </Text>
+
+          {!loaded ? (
+            <View style={styles.loading}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : (
+            <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              {RFP_FIELD_LABEL_KEYS.map((key, index) => (
+                <View
+                  key={key}
                   style={[
-                    styles.input,
-                    {
-                      color: colors.foreground,
-                      backgroundColor: colors.background,
-                      borderColor: colors.border,
+                    styles.row,
+                    index < RFP_FIELD_LABEL_KEYS.length - 1 && {
+                      borderBottomWidth: StyleSheet.hairlineWidth,
+                      borderBottomColor: colors.border,
                     },
                   ]}
-                  editable={!saving}
-                />
-              </View>
-            ))}
+                >
+                  <Text style={[styles.keyLabel, { color: colors.muted }]} numberOfLines={1}>
+                    {key}
+                  </Text>
+                  <TextInput
+                    value={values[key]}
+                    onChangeText={(text) => handleChange(key, text)}
+                    placeholder={DEFAULT_RFP_FIELD_LABELS[key]}
+                    placeholderTextColor={colors.muted}
+                    style={[
+                      styles.input,
+                      {
+                        color: colors.foreground,
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
+                      },
+                    ]}
+                    editable={!saving}
+                  />
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.actions}>
+            <Pressable
+              onPress={handleReset}
+              disabled={saving}
+              style={[styles.secondaryButton, { borderColor: colors.border }]}
+            >
+              <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>
+                Reset to defaults
+              </Text>
+            </Pressable>
+
+            <Pressable
+              onPress={handleSave}
+              disabled={saving || !isCloudMode}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: isCloudMode ? colors.primary : colors.muted },
+              ]}
+            >
+              {saving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>Save labels</Text>
+              )}
+            </Pressable>
           </View>
-        )}
 
-        <View style={styles.actions}>
-          <Pressable
-            onPress={handleReset}
-            disabled={saving}
-            style={[styles.secondaryButton, { borderColor: colors.border }]}
-          >
-            <Text style={[styles.secondaryButtonText, { color: colors.foreground }]}>
-              Reset to defaults
+          {!isCloudMode && (
+            <Text style={[styles.hint, { color: colors.muted }]}>
+              Sign in to save your custom labels across devices.
             </Text>
-          </Pressable>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-          <Pressable
-            onPress={handleSave}
-            disabled={saving || !isCloudMode}
-            style={[
-              styles.primaryButton,
-              { backgroundColor: isCloudMode ? colors.primary : colors.muted },
-            ]}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Save labels</Text>
-            )}
-          </Pressable>
-        </View>
-
-        {!isCloudMode && (
-          <Text style={[styles.hint, { color: colors.muted }]}>
-            Sign in to save your custom labels across devices.
-          </Text>
-        )}
-      </ScrollView>
     </ScreenContainer>
   );
 }

@@ -20,11 +20,11 @@ export default function SignUpScreen() {
   const colors = useColors();
   const router = useRouter();
   const { user, signUp, error: authError, loading: authLoading } = useAuth({ autoFetch: true });
-  const [name, setName] = useState("abc");
-  const [username, setUsername] = useState("abcd");
-  const [email, setEmail] = useState("abc@gmail.com");
-  const [password, setPassword] = useState("Testme123");
-  const [confirmPassword, setConfirmPassword] = useState("Testme123");
+  const [name, setName] = useState(__DEV__ ? "abc" : '');
+  const [username, setUsername] = useState(__DEV__ ? "abcd" : '');
+  const [email, setEmail] = useState(__DEV__ ? "abc@gmail.com" : '');
+  const [password, setPassword] = useState(__DEV__ ? "Testme123" : '');
+  const [confirmPassword, setConfirmPassword] = useState(__DEV__ ? "Testme123" : '');
   const [submitting, setSubmitting] = useState(false);
 
   if (user) {
@@ -118,7 +118,7 @@ export default function SignUpScreen() {
             placeholderTextColor={colors.muted}
             autoCapitalize="words"
             editable={!loading}
-            className="rounded-xl border px-4 py-3 text-base mb-4"
+            className="rounded-xl border px-4 py-3  mb-4"
             style={{
               borderColor: colors.border,
               color: colors.foreground,
@@ -137,7 +137,7 @@ export default function SignUpScreen() {
             autoCapitalize="none"
             autoCorrect={false}
             editable={!loading}
-            className="rounded-xl border px-4 py-3 text-base mb-4"
+            className="rounded-xl border px-4 py-3  mb-4"
             style={{
               borderColor: colors.border,
               color: colors.foreground,
@@ -157,7 +157,7 @@ export default function SignUpScreen() {
             autoCorrect={false}
             keyboardType="email-address"
             editable={!loading}
-            className="rounded-xl border px-4 py-3 text-base mb-4"
+            className="rounded-xl border px-4 py-3  mb-4"
             style={{
               borderColor: colors.border,
               color: colors.foreground,
@@ -175,7 +175,7 @@ export default function SignUpScreen() {
             placeholderTextColor={colors.muted}
             secureTextEntry
             editable={!loading}
-            className="rounded-xl border px-4 py-3 text-base mb-4"
+            className="rounded-xl border px-4 py-3  mb-4"
             style={{
               borderColor: colors.border,
               color: colors.foreground,
@@ -193,7 +193,7 @@ export default function SignUpScreen() {
             placeholderTextColor={colors.muted}
             secureTextEntry
             editable={!loading}
-            className="rounded-xl border px-4 py-3 text-base mb-6"
+            className="rounded-xl border px-4 py-3  mb-6"
             style={{
               borderColor: colors.border,
               color: colors.foreground,

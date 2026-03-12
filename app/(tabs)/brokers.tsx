@@ -12,6 +12,7 @@ import {
   Alert,
   StyleSheet,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
@@ -70,6 +71,7 @@ export default function BrokersScreen() {
   const [search, setSearch] = useState("");
   const [selectedBroker, setSelectedBroker] = useState<LocalBroker | null>(null);
   const [showAddBroker, setShowAddBroker] = useState(false);
+  const [isSavingBroker, setIsSavingBroker] = useState(false);
   const [newBrokerName, setNewBrokerName] = useState("");
   const [newBrokerCompany, setNewBrokerCompany] = useState("");
   const [brokerFormErrors, setBrokerFormErrors] = useState<{ name?: string }>({});
@@ -104,14 +106,22 @@ export default function BrokersScreen() {
       return;
     }
     setBrokerFormErrors({});
+    setIsSavingBroker(true);
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await createBroker({
-      name,
-      company: newBrokerCompany.trim() || undefined,
-    });
-    setNewBrokerName("");
-    setNewBrokerCompany("");
-    setShowAddBroker(false);
+
+    try {
+      await createBroker({
+        name,
+        company: newBrokerCompany.trim() || undefined,
+      });
+      setNewBrokerName("");
+      setNewBrokerCompany("");
+      setShowAddBroker(false);
+    } catch (err) {
+      Alert.alert("Error", "Failed to save broker. Please try again.");
+    } finally {
+      setIsSavingBroker(false);
+    }
   };
 
   const handleDeleteBroker = (broker: LocalBroker) => {
@@ -459,14 +469,18 @@ export default function BrokersScreen() {
         style={[styles.modalContainer, { backgroundColor: colors.background }]}
       >
         <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => setShowAddBroker(false)} style={styles.modalClose}>
-            <Text style={[styles.modalCloseText, { color: colors.primary }]}>Cancel</Text>
+          <TouchableOpacity onPress={() => setShowAddBroker(false)} style={styles.modalClose} disabled={isSavingBroker}>
+            <Text style={[styles.modalCloseText, { color: isSavingBroker ? colors.muted : colors.primary }]}>Cancel</Text>
           </TouchableOpacity>
           <Text style={[styles.modalTitle, { color: colors.foreground }]}>New Broker</Text>
-          <TouchableOpacity onPress={handleAddBroker} style={styles.modalSave}>
-            <Text style={[styles.modalSaveText, { color: newBrokerName.trim() ? colors.primary : colors.muted }]}>
-              Save
-            </Text>
+          <TouchableOpacity onPress={handleAddBroker} style={[styles.modalSave, { minWidth: 44, alignItems: "flex-end" }]} disabled={isSavingBroker}>
+            {isSavingBroker ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={[styles.modalSaveText, { color: newBrokerName.trim() ? colors.primary : colors.muted }]}>
+                Save
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 
