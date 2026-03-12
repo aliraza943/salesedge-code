@@ -8,7 +8,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import type { Request, Response } from "express";
 import { authRequired } from "./auth-mongo";
 
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/aiplanner";
+const MONGO_URI = process.env.MONGODB_URI || '';
 const COLLECTION_NAME = "rfps";
 
 export type RfpDocument = {
@@ -33,7 +33,6 @@ async function getClient(): Promise<MongoClient> {
   if (!client) {
     client = new MongoClient(MONGO_URI);
     let res= await client.connect();
-       console.log("MongoDB Connected ✅",res);
   }
   return client;
 }

@@ -281,6 +281,10 @@ export default function RfpsScreen() {
   // Stage transition animation
   const [movingRfpId, setMovingRfpId] = useState<string | null>(null);
 
+  // Validation errors (keyed by field key, not label)
+  const [createErrors, setCreateErrors] = useState<Partial<Record<string, string>>>({});
+  const [editErrors, setEditErrors] = useState<Partial<Record<string, string>>>({});
+
   useFocusEffect(
     useCallback(() => {
       refreshAll();
@@ -323,22 +327,141 @@ export default function RfpsScreen() {
     setFormNotes("");
     setFormFollowUpDate("");
     setFieldsVisible(false);
+    setCreateErrors({});
   };
 
+  // Validation: use field keys; error messages use getRfpLabel for display consistency
+  const validateRfpForm = useCallback(
+    (values: {
+      case: string;
+      brokerage: string;
+      brokerageContact: string;
+      lives: string;
+      effectiveDate: string;
+      premium: string;
+      followUpDate: string;
+    }): Partial<Record<string, string>> => {
+      const errors: Partial<Record<string, string>> = {};
+      const caseVal = values.case.trim();
+      const brokerageVal = values.brokerage.trim();
+      const livesVal = values.lives.trim();
+      const effectiveDateVal = values.effectiveDate.trim();
+      const premiumVal = values.premium.trim();
+      const followUpDateVal = values.followUpDate.trim();
+
+      if (!caseVal) {
+        errors.case = `${getRfpLabel("case")} is required.`;
+      }
+      if (!brokerageVal) {
+        errors.brokerage = `${getRfpLabel("brokerage")} is required.`;
+      }
+      if (!livesVal) {
+        errors.lives = `${getRfpLabel("lives")} is required.`;
+      } else {
+        const n = parseInt(livesVal, 10);
+        if (Number.isNaN(n) || n < 1 || String(n) !== livesVal) {
+          errors.lives = `${getRfpLabel("lives")} must be a positive whole number.`;
+        }
+      }
+      if (!effectiveDateVal) {
+        errors.effectiveDate = `${getRfpLabel("effectiveDate")} is required.`;
+      } else {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(effectiveDateVal)) {
+          errors.effectiveDate = `${getRfpLabel("effectiveDate")} must be a valid date (YYYY-MM-DD).`;
+        } else {
+          const d = new Date(effectiveDateVal + "T12:00:00");
+          if (Number.isNaN(d.getTime())) {
+            errors.effectiveDate = `${getRfpLabel("effectiveDate")} must be a valid date.`;
+          }
+        }
+      }
+      if (!premiumVal) {
+        errors.premium = `${getRfpLabel("premium")} is required.`;
+      } else {
+        const num = parseFloat(premiumVal.replace(/[^0-9.-]/g, ""));
+        if (Number.isNaN(num) || num <= 0) {
+          errors.premium = `${getRfpLabel("premium")} must be a valid positive number.`;
+        }
+      }
+      if (followUpDateVal) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(followUpDateVal)) {
+          errors.followUpDate = `${getRfpLabel("followUpDate")} must be a valid date (YYYY-MM-DD).`;
+        } else {
+          const followD = new Date(followUpDateVal + "T12:00:00");
+          if (Number.isNaN(followD.getTime())) {
+            errors.followUpDate = `${getRfpLabel("followUpDate")} must be a valid date.`;
+          } else if (effectiveDateVal) {
+            const effD = new Date(effectiveDateVal + "T12:00:00");
+            if (!Number.isNaN(effD.getTime()) && followD < effD) {
+              errors.followUpDate = `${getRfpLabel("followUpDate")} cannot be earlier than ${getRfpLabel("effectiveDate")}.`;
+            }
+          }
+        }
+      }
+      return errors;
+    },
+    [getRfpLabel]
+  );
+
+  // Run validation with current create form values (with optional overrides) and set errors — for instant feedback
+  const validateCreateWithOverride = useCallback(
+    (override: Partial<{ case: string; brokerage: string; brokerageContact: string; lives: string; effectiveDate: string; premium: string; followUpDate: string }>) => {
+      const values = {
+        case: override.case ?? formCase,
+        brokerage: override.brokerage ?? formBroker,
+        brokerageContact: override.brokerageContact ?? formBrokerContact,
+        lives: override.lives ?? formLives,
+        effectiveDate: override.effectiveDate ?? formEffectiveDate,
+        premium: override.premium ?? formPremium,
+        followUpDate: override.followUpDate ?? formFollowUpDate,
+      };
+      setCreateErrors(validateRfpForm(values));
+    },
+    [formCase, formBroker, formBrokerContact, formLives, formEffectiveDate, formPremium, formFollowUpDate, validateRfpForm]
+  );
+
+  // Run validation with current edit form values (with optional overrides) and set errors
+  const validateEditWithOverride = useCallback(
+    (override: Partial<{ case: string; brokerage: string; brokerageContact: string; lives: string; effectiveDate: string; premium: string; followUpDate: string }>) => {
+      const values = {
+        case: override.case ?? editCase,
+        brokerage: override.brokerage ?? editBroker,
+        brokerageContact: override.brokerageContact ?? editBrokerContact,
+        lives: override.lives ?? editLives,
+        effectiveDate: override.effectiveDate ?? editEffectiveDate,
+        premium: override.premium ?? editPremium,
+        followUpDate: override.followUpDate ?? editFollowUpDate,
+      };
+      setEditErrors(validateRfpForm(values));
+    },
+    [editCase, editBroker, editBrokerContact, editLives, editEffectiveDate, editPremium, editFollowUpDate, validateRfpForm]
+  );
+
   const handleCreate = useCallback(async () => {
-    if (!formCase.trim() || !formBroker.trim()) {
-      Alert.alert("Required", `${getRfpLabel("case")} and ${getRfpLabel("brokerage")} are required.`);
+    const values = {
+      case: formCase,
+      brokerage: formBroker,
+      brokerageContact: formBrokerContact,
+      lives: formLives,
+      effectiveDate: formEffectiveDate,
+      premium: formPremium,
+      followUpDate: formFollowUpDate,
+    };
+    const errors = validateRfpForm(values);
+    if (Object.keys(errors).length > 0) {
+      setCreateErrors(errors);
       return;
     }
+    setCreateErrors({});
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const newRfp = await createRfp({
       title: formCase.trim(),
       client: formBroker.trim(),
       brokerContact: formBrokerContact.trim() || undefined,
-      lives: formLives.trim() ? parseInt(formLives.trim(), 10) : undefined,
-      effectiveDate: formEffectiveDate.trim() || undefined,
-      premium: formPremium.trim() || undefined,
+      lives: parseInt(formLives.trim(), 10),
+      effectiveDate: formEffectiveDate.trim(),
+      premium: formPremium.trim(),
       status: "draft",
       notes: formNotes.trim() || undefined,
       followUpDate: formFollowUpDate.trim() || undefined,
@@ -370,10 +493,25 @@ export default function RfpsScreen() {
     await refreshAll();
     setShowCreate(false);
     resetCreateForm();
-  }, [formCase, formBroker, formBrokerContact, formLives, formEffectiveDate, formPremium, formNotes, formFollowUpDate, refreshAll, createRfp, createEvent, getOrCreateBroker, updateBroker]);
+  }, [formCase, formBroker, formBrokerContact, formLives, formEffectiveDate, formPremium, formNotes, formFollowUpDate, refreshAll, createRfp, createEvent, getOrCreateBroker, updateBroker, validateRfpForm]);
 
   const handleUpdate = useCallback(async () => {
     if (!editingRfp) return;
+    const values = {
+      case: editCase,
+      brokerage: editBroker,
+      brokerageContact: editBrokerContact,
+      lives: editLives,
+      effectiveDate: editEffectiveDate,
+      premium: editPremium,
+      followUpDate: editFollowUpDate,
+    };
+    const errors = validateRfpForm(values);
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      return;
+    }
+    setEditErrors({});
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const wasNotSold = editingRfp.status !== "sold";
@@ -420,7 +558,7 @@ export default function RfpsScreen() {
     await refreshAll();
     setEditingRfp(null);
     setDetailRfp(null);
-  }, [editingRfp, editCase, editBroker, editBrokerContact, editLives, editEffectiveDate, editPremium, editNotes, editFollowUpDate, editStatus, refreshAll, updateRfpData, updateSalesGoal, createEvent]);
+  }, [editingRfp, editCase, editBroker, editBrokerContact, editLives, editEffectiveDate, editPremium, editNotes, editFollowUpDate, editStatus, refreshAll, updateRfpData, updateSalesGoal, createEvent, validateRfpForm]);
 
   const handleDelete = (rfp: LocalRfp) => {
     const doDelete = async () => {
@@ -450,6 +588,7 @@ export default function RfpsScreen() {
     setEditNotes(rfp.notes || "");
     setEditFollowUpDate(rfp.followUpDate || "");
     setEditStatus(rfp.status);
+    setEditErrors({});
     setDetailRfp(null);
   };
 
@@ -609,27 +748,49 @@ export default function RfpsScreen() {
         };
 
         if (voiceTarget === "create") {
+          const premVal = formatPremiumValue(parsed.premium);
           if (parsed.title) setFormCase(parsed.title);
           if (parsed.client) setFormBroker(parsed.client);
           if (parsed.brokerContact) setFormBrokerContact(parsed.brokerContact);
           if (parsed.lives) setFormLives(String(parsed.lives));
           if (parsed.effectiveDate) setFormEffectiveDate(parsed.effectiveDate);
-          const premVal = formatPremiumValue(parsed.premium);
           if (premVal) setFormPremium(premVal);
           if (parsed.followUpDate) setFormFollowUpDate(parsed.followUpDate);
           if (parsed.notes) setFormNotes(parsed.notes);
-          // Show fields after voice input fills them
           setFieldsVisible(true);
+          // Run validation with parsed values so errors show immediately after voice fill
+          setCreateErrors(
+            validateRfpForm({
+              case: parsed.title || formCase,
+              brokerage: parsed.client || formBroker,
+              brokerageContact: parsed.brokerContact || formBrokerContact,
+              lives: parsed.lives != null ? String(parsed.lives) : formLives,
+              effectiveDate: parsed.effectiveDate || formEffectiveDate,
+              premium: premVal || formPremium,
+              followUpDate: parsed.followUpDate || formFollowUpDate,
+            })
+          );
         } else if (voiceTarget === "edit") {
+          const premVal = formatPremiumValue(parsed.premium);
           if (parsed.title) setEditCase(parsed.title);
           if (parsed.client) setEditBroker(parsed.client);
           if (parsed.brokerContact) setEditBrokerContact(parsed.brokerContact);
           if (parsed.lives) setEditLives(String(parsed.lives));
           if (parsed.effectiveDate) setEditEffectiveDate(parsed.effectiveDate);
-          const premVal = formatPremiumValue(parsed.premium);
           if (premVal) setEditPremium(premVal);
           if (parsed.followUpDate) setEditFollowUpDate(parsed.followUpDate);
           if (parsed.notes) setEditNotes(parsed.notes);
+          setEditErrors(
+            validateRfpForm({
+              case: parsed.title || editCase,
+              brokerage: parsed.client || editBroker,
+              brokerageContact: parsed.brokerContact || editBrokerContact,
+              lives: parsed.lives != null ? String(parsed.lives) : editLives,
+              effectiveDate: parsed.effectiveDate || editEffectiveDate,
+              premium: premVal || editPremium,
+              followUpDate: parsed.followUpDate || editFollowUpDate,
+            })
+          );
         }
       }
 
@@ -644,7 +805,16 @@ export default function RfpsScreen() {
   };
 
   // Contact field with autocomplete from existing brokers
-  const renderContactField = (label: string, value: string, onChange: (t: string) => void, placeholder: string, showSuggestions: boolean, setShowSuggestions: (v: boolean) => void) => {
+  const renderContactField = (
+    label: string,
+    value: string,
+    onChange: (t: string) => void,
+    placeholder: string,
+    showSuggestions: boolean,
+    setShowSuggestions: (v: boolean) => void,
+    error?: string,
+    clearError?: () => void
+  ) => {
     const q = value.toLowerCase().trim();
     const suggestions = q.length > 0
       ? brokers.filter((b) => b.name.toLowerCase().includes(q) && b.name.toLowerCase() !== q).slice(0, 5)
@@ -659,7 +829,7 @@ export default function RfpsScreen() {
             {
               color: colors.foreground,
               backgroundColor: colors.surface,
-              borderColor: showSuggestions && suggestions.length > 0 ? colors.primary : colors.border,
+              borderColor: error ? colors.error : showSuggestions && suggestions.length > 0 ? colors.primary : colors.border,
             },
           ]}
           placeholder={placeholder}
@@ -668,11 +838,15 @@ export default function RfpsScreen() {
           onChangeText={(text) => {
             onChange(text);
             setShowSuggestions(true);
+            clearError?.();
           }}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           returnKeyType="done"
         />
+        {error ? (
+          <Text style={{ fontSize: 12, color: colors.error, marginTop: 4 }}>{error}</Text>
+        ) : null}
         {showSuggestions && suggestions.length > 0 && (
           <View style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, marginTop: 4, overflow: "hidden" }}>
             {suggestions.map((b, idx) => (
@@ -708,8 +882,16 @@ export default function RfpsScreen() {
     );
   };
 
-  // Shared form field renderer
-  const renderFormField = (label: string, value: string, onChange: (t: string) => void, placeholder: string, options?: { keyboardType?: "default" | "numeric"; multiline?: boolean }) => (
+  // Shared form field renderer (error and clearError for validation UX)
+  const renderFormField = (
+    label: string,
+    value: string,
+    onChange: (t: string) => void,
+    placeholder: string,
+    options?: { keyboardType?: "default" | "numeric"; multiline?: boolean },
+    error?: string,
+    clearError?: () => void
+  ) => (
     <View style={{ marginBottom: 14 }}>
       <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 5 }}>{label}</Text>
       <TextInput
@@ -718,33 +900,50 @@ export default function RfpsScreen() {
           {
             color: colors.foreground,
             backgroundColor: colors.surface,
-            borderColor: colors.border,
+            borderColor: error ? colors.error : colors.border,
             ...(options?.multiline ? { minHeight: 100, textAlignVertical: "top" as const } : {}),
           },
         ]}
         placeholder={placeholder}
         placeholderTextColor={colors.muted + "80"}
         value={value}
-        onChangeText={onChange}
+        onChangeText={(text) => {
+          onChange(text);
+          clearError?.();
+        }}
         keyboardType={options?.keyboardType || "default"}
         multiline={options?.multiline}
         returnKeyType={options?.multiline ? "default" : "done"}
       />
+      {error ? (
+        <Text style={{ fontSize: 12, color: colors.error, marginTop: 4 }}>{error}</Text>
+      ) : null}
     </View>
   );
 
   // Date field with calendar picker
-  const renderDateField = (label: string, value: string, onChange: (t: string) => void, showPicker: boolean, setShowPicker: (v: boolean) => void) => (
+  const renderDateField = (
+    label: string,
+    value: string,
+    onChange: (t: string) => void,
+    showPicker: boolean,
+    setShowPicker: (v: boolean) => void,
+    error?: string,
+    clearError?: () => void
+  ) => (
     <View style={{ marginBottom: 14 }}>
       <Text style={{ fontSize: 13, fontWeight: "500", color: colors.muted, marginBottom: 5 }}>{label}</Text>
       <TouchableOpacity
-        onPress={() => setShowPicker(!showPicker)}
+        onPress={() => {
+          setShowPicker(!showPicker);
+          clearError?.();
+        }}
         activeOpacity={0.7}
         style={[
           styles.input,
           {
             backgroundColor: colors.surface,
-            borderColor: showPicker ? colors.primary : colors.border,
+            borderColor: error ? colors.error : showPicker ? colors.primary : colors.border,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
@@ -756,9 +955,12 @@ export default function RfpsScreen() {
         </Text>
         <IconSymbol name="calendar" size={20} color={colors.primary} />
       </TouchableOpacity>
+      {error ? (
+        <Text style={{ fontSize: 12, color: colors.error, marginTop: 4 }}>{error}</Text>
+      ) : null}
       {showPicker && (
         <View style={{ marginTop: 8 }}>
-          <DatePicker value={value} onChange={onChange} colors={colors} onClose={() => setShowPicker(false)} />
+          <DatePicker value={value} onChange={(date) => { onChange(date); clearError?.(); }} colors={colors} onClose={() => setShowPicker(false)} />
         </View>
       )}
     </View>
@@ -1063,16 +1265,16 @@ export default function RfpsScreen() {
               {/* Parsed preview (shows after voice fills fields) */}
               {renderParsedPreview()}
 
-              {/* Editable fields — always visible so user can manually enter/edit any field */}
+              {/* Editable fields — always visible so user can manually enter/edit any field (validation on change for instant feedback) */}
               <View>
-                {renderFormField(`${getRfpLabel("case")} *`, formCase, setFormCase, "e.g., ABC Corporation Group Benefits")}
-                {renderFormField(`${getRfpLabel("brokerage")} *`, formBroker, setFormBroker, "e.g., Smith & Associates")}
-                {renderContactField(getRfpLabel("brokerageContact"), formBrokerContact, setFormBrokerContact, "e.g., John Smith", showContactSuggestions, setShowContactSuggestions)}
-                {renderFormField(getRfpLabel("lives"), formLives, setFormLives, "e.g., 250", { keyboardType: "numeric" })}
-                {renderDateField(getRfpLabel("effectiveDate"), formEffectiveDate, setFormEffectiveDate, showCreateDatePicker, setShowCreateDatePicker)}
-                {renderFormField(getRfpLabel("premium"), formPremium, setFormPremium, "e.g., 150000", { keyboardType: "numeric" })}
-                {renderDateField(getRfpLabel("followUpDate"), formFollowUpDate, setFormFollowUpDate, showCreateFollowUpPicker, setShowCreateFollowUpPicker)}
-                {renderFormField(getRfpLabel("notes"), formNotes, setFormNotes, "Any additional notes or details...", { multiline: true })}
+                {renderFormField(`${getRfpLabel("case")} *`, formCase, (t) => { setFormCase(t); validateCreateWithOverride({ case: t }); }, "e.g., ABC Corporation Group Benefits", undefined, createErrors.case)}
+                {renderFormField(`${getRfpLabel("brokerage")} *`, formBroker, (t) => { setFormBroker(t); validateCreateWithOverride({ brokerage: t }); }, "e.g., Smith & Associates", undefined, createErrors.brokerage)}
+                {renderContactField(getRfpLabel("brokerageContact"), formBrokerContact, (t) => { setFormBrokerContact(t); validateCreateWithOverride({ brokerageContact: t }); }, "e.g., John Smith", showContactSuggestions, setShowContactSuggestions, createErrors.brokerageContact)}
+                {renderFormField(getRfpLabel("lives"), formLives, (t) => { setFormLives(t); validateCreateWithOverride({ lives: t }); }, "e.g., 250", { keyboardType: "numeric" }, createErrors.lives)}
+                {renderDateField(getRfpLabel("effectiveDate"), formEffectiveDate, (d) => { setFormEffectiveDate(d); validateCreateWithOverride({ effectiveDate: d }); }, showCreateDatePicker, setShowCreateDatePicker, createErrors.effectiveDate)}
+                {renderFormField(getRfpLabel("premium"), formPremium, (t) => { setFormPremium(t); validateCreateWithOverride({ premium: t }); }, "e.g., 150000", { keyboardType: "numeric" }, createErrors.premium)}
+                {renderDateField(getRfpLabel("followUpDate"), formFollowUpDate, (d) => { setFormFollowUpDate(d); validateCreateWithOverride({ followUpDate: d }); }, showCreateFollowUpPicker, setShowCreateFollowUpPicker, createErrors.followUpDate)}
+                {renderFormField(getRfpLabel("notes"), formNotes, setFormNotes, "Any additional notes or details...", { multiline: true }, createErrors.notes)}
               </View>
 
               {/* Re-record button */}
@@ -1321,14 +1523,14 @@ export default function RfpsScreen() {
                   ))}
                 </ScrollView>
 
-                {renderFormField(getRfpLabel("case"), editCase, setEditCase, "Case name")}
-                {renderFormField(getRfpLabel("brokerage"), editBroker, setEditBroker, "Brokerage name")}
-                {renderContactField(getRfpLabel("brokerageContact"), editBrokerContact, setEditBrokerContact, "Contact person", showEditContactSuggestions, setShowEditContactSuggestions)}
-                {renderFormField(getRfpLabel("lives"), editLives, setEditLives, `Number of ${getRfpLabel("lives").toLowerCase()}`, { keyboardType: "numeric" })}
-                {renderDateField(getRfpLabel("effectiveDate"), editEffectiveDate, setEditEffectiveDate, showEditDatePicker, setShowEditDatePicker)}
-                {renderFormField(getRfpLabel("premium"), editPremium, setEditPremium, "Premium amount", { keyboardType: "numeric" })}
-                {renderDateField(getRfpLabel("followUpDate"), editFollowUpDate, setEditFollowUpDate, showEditFollowUpPicker, setShowEditFollowUpPicker)}
-                {renderFormField(getRfpLabel("notes"), editNotes, setEditNotes, "Notes...", { multiline: true })}
+                {renderFormField(getRfpLabel("case"), editCase, (t) => { setEditCase(t); validateEditWithOverride({ case: t }); }, "Case name", undefined, editErrors.case)}
+                {renderFormField(getRfpLabel("brokerage"), editBroker, (t) => { setEditBroker(t); validateEditWithOverride({ brokerage: t }); }, "Brokerage name", undefined, editErrors.brokerage)}
+                {renderContactField(getRfpLabel("brokerageContact"), editBrokerContact, (t) => { setEditBrokerContact(t); validateEditWithOverride({ brokerageContact: t }); }, "Contact person", showEditContactSuggestions, setShowEditContactSuggestions, editErrors.brokerageContact)}
+                {renderFormField(getRfpLabel("lives"), editLives, (t) => { setEditLives(t); validateEditWithOverride({ lives: t }); }, `Number of ${getRfpLabel("lives").toLowerCase()}`, { keyboardType: "numeric" }, editErrors.lives)}
+                {renderDateField(getRfpLabel("effectiveDate"), editEffectiveDate, (d) => { setEditEffectiveDate(d); validateEditWithOverride({ effectiveDate: d }); }, showEditDatePicker, setShowEditDatePicker, editErrors.effectiveDate)}
+                {renderFormField(getRfpLabel("premium"), editPremium, (t) => { setEditPremium(t); validateEditWithOverride({ premium: t }); }, "Premium amount", { keyboardType: "numeric" }, editErrors.premium)}
+                {renderDateField(getRfpLabel("followUpDate"), editFollowUpDate, (d) => { setEditFollowUpDate(d); validateEditWithOverride({ followUpDate: d }); }, showEditFollowUpPicker, setShowEditFollowUpPicker, editErrors.followUpDate)}
+                {renderFormField(getRfpLabel("notes"), editNotes, setEditNotes, "Notes...", { multiline: true }, editErrors.notes)}
                 <View style={{ height: 40 }} />
               </ScrollView>
             </KeyboardAvoidingView>

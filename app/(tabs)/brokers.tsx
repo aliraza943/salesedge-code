@@ -72,6 +72,7 @@ export default function BrokersScreen() {
   const [showAddBroker, setShowAddBroker] = useState(false);
   const [newBrokerName, setNewBrokerName] = useState("");
   const [newBrokerCompany, setNewBrokerCompany] = useState("");
+  const [brokerFormErrors, setBrokerFormErrors] = useState<{ name?: string }>({});
 
   const [newNote, setNewNote] = useState("");
 
@@ -94,16 +95,22 @@ export default function BrokersScreen() {
   }, [brokers, search]);
 
   const handleAddBroker = async () => {
-    if (!newBrokerName.trim()) return;
+    const name = newBrokerName.trim();
+    const errors: { name?: string } = {};
+    if (!name) errors.name = "Name cannot be empty.";
+    if (Object.keys(errors).length > 0) {
+      setBrokerFormErrors(errors);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    setBrokerFormErrors({});
     if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await createBroker({
-      name: newBrokerName.trim(),
+      name,
       company: newBrokerCompany.trim() || undefined,
-
     });
     setNewBrokerName("");
     setNewBrokerCompany("");
-
     setShowAddBroker(false);
   };
 
@@ -467,13 +474,27 @@ export default function BrokersScreen() {
           <View>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>Name *</Text>
             <TextInput
-              style={[styles.fieldInput, { backgroundColor: colors.surface, color: colors.foreground, borderColor: colors.border }]}
+              style={[
+                styles.fieldInput,
+                {
+                  backgroundColor: colors.surface,
+                  color: colors.foreground,
+                  borderColor: brokerFormErrors.name ? colors.error : colors.border,
+                  borderWidth: brokerFormErrors.name ? 1.5 : 1,
+                },
+              ]}
               placeholder="John Doe"
               placeholderTextColor={colors.muted}
               value={newBrokerName}
-              onChangeText={setNewBrokerName}
+              onChangeText={(text) => {
+                setNewBrokerName(text);
+                if (brokerFormErrors.name) setBrokerFormErrors((prev) => ({ ...prev, name: undefined }));
+              }}
               autoFocus
             />
+            {brokerFormErrors.name ? (
+              <Text style={[styles.fieldError, { color: colors.error }]}>{brokerFormErrors.name}</Text>
+            ) : null}
           </View>
           <View>
             <Text style={[styles.fieldLabel, { color: colors.muted }]}>Company</Text>
@@ -501,6 +522,7 @@ export default function BrokersScreen() {
         <TouchableOpacity
           onPress={() => {
             if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setBrokerFormErrors({});
             setShowAddBroker(true);
           }}
           style={[styles.addButton, { backgroundColor: colors.primary }]}
@@ -856,6 +878,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+  },
+  fieldError: {
+    fontSize: 13,
+    marginTop: 6,
   },
   // Last Conversation Summary
   lastConvoSection: {},

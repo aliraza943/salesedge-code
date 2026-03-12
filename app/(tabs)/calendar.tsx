@@ -11,6 +11,7 @@ import {
   Platform,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
 } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useFocusEffect } from "@react-navigation/native";
@@ -24,6 +25,16 @@ import type { LocalEvent } from "@/lib/local-store";
 import { formatTime, formatTimeRange } from "@/lib/utils";
 import { formatDateWithWeekday } from "@/lib/timezone";
 import { REMINDER_OPTIONS } from "@/lib/notifications";
+
+/** Allowed reminder values for calendar events (minutes). Picker shows only these. */
+const ALLOWED_REMINDER_MINUTES = [0, 15, 30, 45, 60] as const;
+const REMINDER_OPTIONS_CALENDAR: { label: string; value: number }[] = [
+  { label: "None", value: 0 },
+  { label: "15 minutes before", value: 15 },
+  { label: "30 minutes before", value: 30 },
+  { label: "45 minutes before", value: 45 },
+  { label: "60 minutes before", value: 60 },
+];
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -41,6 +52,49 @@ function getFirstDayOfMonth(year: number, month: number) {
 
 function formatDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+/** Allowed minute values for the time picker (60 = top of next hour). */
+const TIME_PICKER_MINUTES = [0, 15, 30, 45, 60] as const;
+
+function snapMinuteToPicker(m: number): number {
+  if (m <= 7) return 0;
+  if (m <= 22) return 15;
+  if (m <= 37) return 30;
+  if (m <= 52) return 45;
+  return 60;
+}
+
+/** Parse 24h "HH:MM" to 12h components; if invalid/empty, return current time. Snaps minute to picker options. */
+function parseTimeToPicker(timeStr: string): { hour12: number; minute: number; isPM: boolean } {
+  const now = new Date();
+  if (!timeStr?.trim()) {
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const hour12 = h % 12 || 12;
+    return { hour12, minute: snapMinuteToPicker(m), isPM: h >= 12 };
+  }
+  const parts = timeStr.trim().split(":");
+  const hour24 = parseInt(parts[0], 10);
+  const minuteRaw = Math.min(59, Math.max(0, parseInt(parts[1], 10) || 0));
+  const minute = snapMinuteToPicker(minuteRaw);
+  if (isNaN(hour24)) return { hour12: now.getHours() % 12 || 12, minute: snapMinuteToPicker(now.getMinutes()), isPM: now.getHours() >= 12 };
+  const h = hour24 % 24;
+  const hour12 = h % 12 || 12;
+  return { hour12, minute, isPM: h >= 12 };
+}
+
+/** Convert 12h picker values to 24h "HH:MM". Minute 60 is treated as next hour :00. */
+function pickerToTime24(hour12: number, minute: number, isPM: boolean): string {
+  let hour24 = hour12;
+  if (isPM && hour12 !== 12) hour24 += 12;
+  if (!isPM && hour12 === 12) hour24 = 0;
+  let m = minute;
+  if (minute === 60) {
+    hour24 = (hour24 + 1) % 24;
+    m = 0;
+  }
+  return `${String(hour24).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 type DayItem = {
@@ -83,6 +137,11 @@ export default function CalendarScreen() {
 
   const [formReminder, setFormReminder] = useState<number>(0);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [pickerHour, setPickerHour] = useState(9);
+  const [pickerMinute, setPickerMinute] = useState(0);
+  const [pickerPM, setPickerPM] = useState(true);
+  const [formErrors, setFormErrors] = useState<{ title?: string; time?: string; reminder?: string }>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -156,8 +215,8 @@ export default function CalendarScreen() {
     setFormTitle("");
     setFormDescription("");
     setFormStartTime("");
-
     setFormReminder(15);
+    setFormErrors({});
     setShowAddModal(true);
   };
 
@@ -166,29 +225,43 @@ export default function CalendarScreen() {
     setFormTitle(event.title);
     setFormDescription(event.description || "");
     setFormStartTime(event.startTime || "");
-
-    setFormReminder(event.reminderMinutes || 0);
+    const reminder = event.reminderMinutes ?? 0;
+    setFormReminder((ALLOWED_REMINDER_MINUTES as readonly number[]).includes(reminder) ? reminder : 15);
+    setFormErrors({});
     setShowAddModal(true);
   };
 
   const handleSave = async () => {
-    if (!formTitle.trim()) return;
+    const title = formTitle.trim();
+    const time = formStartTime.trim();
+    const errors: { title?: string; time?: string; reminder?: string } = {};
+    if (!title) errors.title = "Title cannot be empty.";
+    if (!time) errors.time = "Please select a time for the event.";
+    if (!(ALLOWED_REMINDER_MINUTES as readonly number[]).includes(formReminder)) {
+      errors.reminder = "Please select a reminder.";
+    }
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    setFormErrors({});
     let eventId: string;
 
     if (editingEvent) {
       await updateEventData(editingEvent.id, {
-        title: formTitle.trim(),
+        title,
         description: formDescription.trim() || undefined,
-        startTime: formStartTime.trim() || undefined,
+        startTime: time || undefined,
         reminderMinutes: formReminder > 0 ? formReminder : undefined,
       });
       eventId = editingEvent.id;
     } else {
       const newEvent = await createEventData({
-        title: formTitle.trim(),
+        title,
         description: formDescription.trim() || undefined,
         date: selectedDate,
-        startTime: formStartTime.trim() || undefined,
+        startTime: time || undefined,
         reminderMinutes: formReminder > 0 ? formReminder : undefined,
       });
       eventId = newEvent.id;
@@ -215,7 +288,7 @@ export default function CalendarScreen() {
     }
   };
 
-  const selectedReminderLabel = REMINDER_OPTIONS.find((o) => o.value === formReminder)?.label || "None";
+  const selectedReminderLabel = REMINDER_OPTIONS_CALENDAR.find((o) => o.value === formReminder)?.label ?? "None";
 
   return (
     <ScreenContainer edges={["top", "left", "right"]} className="flex-1">
@@ -427,187 +500,426 @@ export default function CalendarScreen() {
 
       {/* Add/Edit Event Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View
-            className="rounded-t-3xl px-5 pt-5 pb-10"
-            style={{ backgroundColor: colors.background }}
-          >
-            <View className="flex-row items-center justify-between mb-5">
-              <TouchableOpacity
-                onPress={() => setShowAddModal(false)}
-                activeOpacity={0.6}
-              >
-                <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
-              </TouchableOpacity>
-              <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
-                {editingEvent ? "Edit Event" : "New Event"}
-              </Text>
-              <TouchableOpacity
-                onPress={handleSave}
-                activeOpacity={0.6}
-              >
-                <Text className="text-base font-semibold" style={{ color: colors.primary }}>Save</Text>
-              </TouchableOpacity>
-            </View>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+            <View
+              className="rounded-t-3xl px-5 pt-5 pb-10"
+              style={{ backgroundColor: colors.background }}
+            >
+              <View className="flex-row items-center justify-between mb-5">
+                <TouchableOpacity
+                  onPress={() => setShowAddModal(false)}
+                  activeOpacity={0.6}
+                >
+                  <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
+                </TouchableOpacity>
+                <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
+                  {editingEvent ? "Edit Event" : "New Event"}
+                </Text>
+                <TouchableOpacity
+                  onPress={handleSave}
+                  activeOpacity={0.6}
+                >
+                  <Text className="text-base font-semibold" style={{ color: colors.primary }}>Save</Text>
+                </TouchableOpacity>
+              </View>
 
-            <ScrollView style={{ maxHeight: 400 }}>
-              <View className="gap-4">
-                <View>
-                  <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Title</Text>
-                  <TextInput
-                    className="rounded-xl px-4 py-3 text-[15px] border"
-                    style={{ borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }}
-                    placeholder="Event title"
-                    placeholderTextColor={colors.muted}
-                    value={formTitle}
-                    onChangeText={setFormTitle}
-                  />
-                </View>
-                <View>
-                  <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Description</Text>
-                  <TextInput
-                    className="rounded-xl px-4 py-3 text-[15px] border"
-                    style={{ borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }}
-                    placeholder="Optional description"
-                    placeholderTextColor={colors.muted}
-                    value={formDescription}
-                    onChangeText={setFormDescription}
-                    multiline
-                  />
-                </View>
-                <View>
-                  <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Time</Text>
-                  <TextInput
-                    className="rounded-xl px-4 py-3 text-[15px] border"
-                    style={{ borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }}
-                    placeholder="HH:MM"
-                    placeholderTextColor={colors.muted}
-                    value={formStartTime}
-                    onChangeText={setFormStartTime}
-                  />
-                </View>
-
-                {/* Reminder Picker */}
-                <View>
-                  <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Reminder</Text>
-                  <Pressable
-                    onPress={() => setShowReminderPicker(true)}
-                    style={({ pressed }) => [
-                      {
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        borderRadius: 12,
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderWidth: 1,
-                        borderColor: colors.border,
+              <ScrollView style={{ maxHeight: 400 }}>
+                <View className="gap-4">
+                  <View>
+                    <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Title</Text>
+                    <TextInput
+                      className="rounded-xl px-4 py-3 text-[15px] border"
+                      style={{
+                        borderColor: formErrors.title ? colors.error : colors.border,
+                        borderWidth: formErrors.title ? 1.5 : 1,
                         backgroundColor: colors.surface,
-                        opacity: pressed ? 0.8 : 1,
+                        color: colors.foreground,
+                      }}
+                      placeholder="Event title"
+                      placeholderTextColor={colors.muted}
+                      value={formTitle}
+                      onChangeText={(text) => {
+                        setFormTitle(text);
+                        if (formErrors.title) setFormErrors((prev) => ({ ...prev, title: undefined }));
+                      }}
+                    />
+                    {formErrors.title ? (
+                      <Text className="text-sm mt-1" style={{ color: colors.error }}>
+                        {formErrors.title}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View>
+                    <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Description</Text>
+                    <TextInput
+                      className="rounded-xl px-4 py-3 text-[15px] border"
+                      style={{ borderColor: colors.border, backgroundColor: colors.surface, color: colors.foreground }}
+                      placeholder="Optional description"
+                      placeholderTextColor={colors.muted}
+                      value={formDescription}
+                      onChangeText={setFormDescription}
+                      multiline
+                    />
+                  </View>
+                  <View>
+                    <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Time</Text>
+                    <Pressable
+                      onPress={() => {
+                        const { hour12, minute, isPM } = parseTimeToPicker(formStartTime);
+                        setPickerHour(hour12);
+                        setPickerMinute(minute);
+                        setPickerPM(isPM);
+                        setShowTimePicker(true);
+                      }}
+                      style={({ pressed }) => [
+                        {
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          borderRadius: 12,
+                          paddingHorizontal: 16,
+                          paddingVertical: 12,
+                          borderWidth: formErrors.time ? 1.5 : 1,
+                          borderColor: formErrors.time ? colors.error : colors.border,
+                          backgroundColor: colors.surface,
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      <Text
+                        className="text-[15px]"
+                        style={{ color: formStartTime.trim() ? colors.foreground : colors.muted }}
+                      >
+                        {formStartTime.trim() ? formatTime(formStartTime) : "Select time"}
+                      </Text>
+                      <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                    </Pressable>
+                    {formErrors.time ? (
+                      <Text className="text-sm mt-1" style={{ color: colors.error }}>
+                        {formErrors.time}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Reminder Picker */}
+                  <View>
+                    <Text className="text-sm font-medium mb-1.5" style={{ color: colors.muted }}>Reminder</Text>
+                    <Pressable
+                      onPress={() => setShowReminderPicker(true)}
+                      style={({ pressed }) => [
+                        {
+                          flexDirection: "row",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          borderRadius: 12,
+                          paddingHorizontal: 16,
+                          paddingVertical: 12,
+                          borderWidth: formErrors.reminder ? 1.5 : 1,
+                          borderColor: formErrors.reminder ? colors.error : colors.border,
+                          backgroundColor: colors.surface,
+                          opacity: pressed ? 0.8 : 1,
+                        },
+                      ]}
+                    >
+                      <View className="flex-row items-center">
+                        <IconSymbol name="bell.fill" size={18} color={formReminder > 0 ? colors.primary : colors.muted} />
+                        <Text
+                          className="text-[15px] ml-2"
+                          style={{ color: formReminder > 0 ? colors.foreground : colors.muted }}
+                        >
+                          {selectedReminderLabel}
+                        </Text>
+                      </View>
+                      <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+                    </Pressable>
+                    {formErrors.reminder ? (
+                      <Text className="text-sm mt-1" style={{ color: colors.error }}>
+                        {formErrors.reminder}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              </ScrollView>
+
+              {/* Time Picker overlay (inside Add Modal so it shows on top) */}
+              {showTimePicker && (
+                <Pressable
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+                  ]}
+                  onPress={() => setShowTimePicker(false)}
+                >
+                  <Pressable
+                    style={[
+                      styles.timePickerSheet,
+                      {
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
                       },
                     ]}
+                    onPress={() => { }}
                   >
-                    <View className="flex-row items-center">
-                      <IconSymbol name="bell.fill" size={18} color={formReminder > 0 ? colors.primary : colors.muted} />
-                      <Text
-                        className="text-[15px] ml-2"
-                        style={{ color: formReminder > 0 ? colors.foreground : colors.muted }}
+                    <View style={styles.timePickerHeader}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowTimePicker(false);
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                       >
-                        {selectedReminderLabel}
+                        <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
+                        Set time
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setFormStartTime(pickerToTime24(pickerHour, pickerMinute, pickerPM));
+                          setFormErrors((prev) => ({ ...prev, time: undefined }));
+                          setShowTimePicker(false);
+                          if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        }}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Text className="text-base font-semibold" style={{ color: colors.primary }}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.timePickerPreview}>
+                      <Text className="text-2xl font-medium tabular-nums" style={{ color: colors.foreground }}>
+                        {pickerHour}:{String(pickerMinute).padStart(2, "0")} {pickerPM ? "PM" : "AM"}
                       </Text>
                     </View>
-                    <IconSymbol name="chevron.right" size={16} color={colors.muted} />
+
+                    <View style={styles.timePickerRow}>
+                      <View style={styles.timePickerColumn}>
+                        <Text className="text-xs font-medium mb-2" style={{ color: colors.muted }}>Hour</Text>
+                        <ScrollView style={styles.timePickerScroll} showsVerticalScrollIndicator={false}>
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => {
+                            const isSelected = pickerHour === h;
+                            return (
+                              <Pressable
+                                key={h}
+                                onPress={() => {
+                                  setPickerHour(h);
+                                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                style={[
+                                  styles.timePickerOption,
+                                  isSelected && { backgroundColor: colors.primary + "18" },
+                                ]}
+                              >
+                                <Text
+                                  className="text-[15px]"
+                                  style={{
+                                    color: isSelected ? colors.primary : colors.foreground,
+                                    fontWeight: isSelected ? "600" : "400",
+                                  }}
+                                >
+                                  {h}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                      <View style={styles.timePickerColumn}>
+                        <Text className="text-xs font-medium mb-2" style={{ color: colors.muted }}>Minute</Text>
+                        <ScrollView style={styles.timePickerScroll} showsVerticalScrollIndicator={false}>
+                          {TIME_PICKER_MINUTES.map((m) => {
+                            const isSelected = pickerMinute === m;
+                            const label = m === 60 ? "60" : String(m).padStart(2, "0");
+                            return (
+                              <Pressable
+                                key={m}
+                                onPress={() => {
+                                  setPickerMinute(m);
+                                  if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                }}
+                                style={[
+                                  styles.timePickerOption,
+                                  isSelected && { backgroundColor: colors.primary + "18" },
+                                ]}
+                              >
+                                <Text
+                                  className="text-[15px] tabular-nums"
+                                  style={{
+                                    color: isSelected ? colors.primary : colors.foreground,
+                                    fontWeight: isSelected ? "600" : "400",
+                                  }}
+                                >
+                                  {label}
+                                </Text>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </View>
+                      <View style={styles.timePickerColumnPeriod}>
+                        <Text className="text-xs font-medium mb-2" style={{ color: colors.muted }}>Period</Text>
+                        <View style={{ gap: 8 }}>
+                          <Pressable
+                            onPress={() => {
+                              setPickerPM(false);
+                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }}
+                            style={[
+                              styles.timePickerPeriodOption,
+                              !pickerPM && { backgroundColor: colors.primary + "18" },
+                            ]}
+                          >
+                            <Text
+                              className="text-[15px] font-medium"
+                              style={{
+                                color: !pickerPM ? colors.primary : colors.foreground,
+                                fontWeight: !pickerPM ? "600" : "400",
+                              }}
+                            >
+                              AM
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => {
+                              setPickerPM(true);
+                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                            }}
+                            style={[
+                              styles.timePickerPeriodOption,
+                              pickerPM && { backgroundColor: colors.primary + "18" },
+                            ]}
+                          >
+                            <Text
+                              className="text-[15px] font-medium"
+                              style={{
+                                color: pickerPM ? colors.primary : colors.foreground,
+                                fontWeight: pickerPM ? "600" : "400",
+                              }}
+                            >
+                              PM
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    </View>
                   </Pressable>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+                </Pressable>
+              )}
 
-      {/* Reminder Picker Modal */}
-      <Modal visible={showReminderPicker} animationType="slide" transparent>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-          <View
-            className="rounded-t-3xl px-5 pt-5 pb-10"
-            style={{ backgroundColor: colors.background }}
-          >
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
-                Set Reminder
-              </Text>
-              <Pressable
-                onPress={() => setShowReminderPicker(false)}
-                style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}
-              >
-                <Text className="text-base font-medium" style={{ color: colors.primary }}>Done</Text>
-              </Pressable>
-            </View>
-
-            {!permissionGranted && Platform.OS !== "web" && (
-              <Pressable
-                onPress={requestPermission}
-                style={({ pressed }) => [
-                  {
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: colors.warning + "15",
-                    borderRadius: 12,
-                    padding: 12,
-                    marginBottom: 12,
-                    opacity: pressed ? 0.8 : 1,
-                  },
-                ]}
-              >
-                <IconSymbol name="bell.fill" size={18} color={colors.warning} />
-                <Text className="text-sm ml-2 flex-1" style={{ color: colors.warning }}>
-                  Tap to enable notification permissions
-                </Text>
-              </Pressable>
-            )}
-
-            <View className="gap-1">
-              {REMINDER_OPTIONS.map((option) => {
-                const isSelected = formReminder === option.value;
-                return (
+              {/* Reminder Picker overlay (inside Add Modal so it shows on top) */}
+              {showReminderPicker && (
+                <Pressable
+                  style={[
+                    StyleSheet.absoluteFill,
+                    { justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.5)" },
+                  ]}
+                  onPress={() => setShowReminderPicker(false)}
+                >
                   <Pressable
-                    key={option.value}
-                    onPress={() => {
-                      setFormReminder(option.value);
-                      if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowReminderPicker(false);
-                    }}
-                    style={({ pressed }) => [
+                    style={[
+                      styles.timePickerSheet,
                       {
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        paddingVertical: 14,
-                        paddingHorizontal: 16,
-                        borderRadius: 12,
-                        backgroundColor: isSelected ? colors.primary + "12" : "transparent",
-                        opacity: pressed ? 0.7 : 1,
+                        backgroundColor: colors.background,
+                        borderColor: colors.border,
                       },
                     ]}
+                    onPress={() => { }}
                   >
-                    <Text
-                      className="text-[15px]"
-                      style={{
-                        color: isSelected ? colors.primary : colors.foreground,
-                        fontWeight: isSelected ? "600" : "400",
-                      }}
-                    >
-                      {option.label}
-                    </Text>
-                    {isSelected && (
-                      <IconSymbol name="checkmark" size={18} color={colors.primary} />
+                    <View style={styles.timePickerHeader}>
+                      <TouchableOpacity
+                        onPress={() => setShowReminderPicker(false)}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <Text className="text-lg font-semibold" style={{ color: colors.foreground }}>
+                        Set Reminder
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => setShowReminderPicker(false)}
+                        activeOpacity={0.6}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      >
+                        <Text className="text-base font-semibold" style={{ color: colors.primary }}>Done</Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {!permissionGranted && Platform.OS !== "web" && (
+                      <Pressable
+                        onPress={requestPermission}
+                        style={({ pressed }) => [
+                          {
+                            flexDirection: "row",
+                            alignItems: "center",
+                            backgroundColor: colors.warning + "15",
+                            borderRadius: 12,
+                            padding: 12,
+                            marginBottom: 12,
+                            opacity: pressed ? 0.8 : 1,
+                          },
+                        ]}
+                      >
+                        <IconSymbol name="bell.fill" size={18} color={colors.warning} />
+                        <Text className="text-sm ml-2 flex-1" style={{ color: colors.warning }}>
+                          Tap to enable notification permissions
+                        </Text>
+                      </Pressable>
                     )}
+
+                    <View className="gap-1">
+                      {REMINDER_OPTIONS_CALENDAR.map((option) => {
+                        const isSelected = formReminder === option.value;
+                        return (
+                          <Pressable
+                            key={option.value}
+                            onPress={() => {
+                              setFormReminder(option.value);
+                              setFormErrors((prev) => ({ ...prev, reminder: undefined }));
+                              if (Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                              setShowReminderPicker(false);
+                            }}
+                            style={({ pressed }) => [
+                              {
+                                flexDirection: "row",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                paddingVertical: 14,
+                                paddingHorizontal: 16,
+                                borderRadius: 12,
+                                backgroundColor: isSelected ? colors.primary + "12" : "transparent",
+                                opacity: pressed ? 0.7 : 1,
+                              },
+                            ]}
+                          >
+                            <Text
+                              className="text-[15px]"
+                              style={{
+                                color: isSelected ? colors.primary : colors.foreground,
+                                fontWeight: isSelected ? "600" : "400",
+                              }}
+                            >
+                              {option.label}
+                            </Text>
+                            {isSelected && (
+                              <IconSymbol name="checkmark" size={18} color={colors.primary} />
+                            )}
+                          </Pressable>
+                        );
+                      })}
+                    </View>
                   </Pressable>
-                );
-              })}
+                </Pressable>
+              )}
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );
@@ -633,5 +945,53 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
+  },
+  timePickerSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+  },
+  timePickerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
+    minHeight: 44,
+  },
+  timePickerPreview: {
+    alignItems: "center",
+    marginBottom: 20,
+    paddingVertical: 12,
+  },
+  timePickerRow: {
+    flexDirection: "row",
+    gap: 16,
+  },
+  timePickerColumn: {
+    flex: 1,
+  },
+  timePickerColumnPeriod: {
+    width: 72,
+  },
+  timePickerScroll: {
+    maxHeight: 180,
+  },
+  timePickerOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  timePickerPeriodOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    alignItems: "center",
+    marginBottom: 4,
   },
 });

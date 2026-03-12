@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, Text, View, Pressable, TouchableOpacity, StyleSheet, Platform, Linking, Alert, ActivityIndicator, TextInput, Modal } from "react-native";
+import { ScrollView, Text, View, Pressable, TouchableOpacity, StyleSheet, Platform, Linking, Alert, ActivityIndicator, TextInput, Modal, KeyboardAvoidingView } from "react-native";
 import { useRouter } from "expo-router";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
@@ -25,6 +25,7 @@ export default function HomeScreen() {
   const [editCurrentSales, setEditCurrentSales] = useState("");
   const [editGoalAmount, setEditGoalAmount] = useState("");
   const [editDeadline, setEditDeadline] = useState("");
+  const [goalFormErrors, setGoalFormErrors] = useState<{ currentSales?: string; goalAmount?: string; deadline?: string }>({});
 
   useFocusEffect(
     useCallback(() => {
@@ -170,21 +171,43 @@ export default function HomeScreen() {
     setEditCurrentSales(String(salesGoal.currentSales));
     setEditGoalAmount(String(salesGoal.goalAmount));
     setEditDeadline(salesGoal.goalDeadline);
+    setGoalFormErrors({});
     setShowEditGoal(true);
   };
 
   const handleSaveGoal = async () => {
-    const current = parseFloat(editCurrentSales.replace(/[^0-9.-]/g, ""));
-    const goal = parseFloat(editGoalAmount.replace(/[^0-9.-]/g, ""));
-    const updates: Record<string, unknown> = {};
-    if (!isNaN(current)) updates.currentSales = current;
-    if (!isNaN(goal) && goal > 0) updates.goalAmount = goal;
-    // Validate deadline is a valid YYYY-MM-DD date
-    if (editDeadline && /^\d{4}-\d{2}-\d{2}$/.test(editDeadline)) {
-      const d = new Date(editDeadline + "T12:00:00");
-      if (!isNaN(d.getTime())) updates.goalDeadline = editDeadline;
+    const currentStr = editCurrentSales.trim();
+    const goalStr = editGoalAmount.trim();
+    const deadlineStr = editDeadline.trim();
+    const errors: { currentSales?: string; goalAmount?: string; deadline?: string } = {};
+
+    const current = currentStr === "" ? NaN : parseFloat(currentStr.replace(/[^0-9.-]/g, ""));
+    if (currentStr === "") errors.currentSales = "Current sales is required.";
+    else if (isNaN(current) || current < 0) errors.currentSales = "Must be a number ≥ 0.";
+
+    const goal = goalStr === "" ? NaN : parseFloat(goalStr.replace(/[^0-9.-]/g, ""));
+    if (goalStr === "") errors.goalAmount = "Sales goal is required.";
+    else if (isNaN(goal) || goal < 0) errors.goalAmount = "Must be a number ≥ 0.";
+
+    if (deadlineStr === "") errors.deadline = "Goal deadline is required.";
+    else if (!/^\d{4}-\d{2}-\d{2}$/.test(deadlineStr)) errors.deadline = "Must be a valid date (YYYY-MM-DD).";
+    else {
+      const d = new Date(deadlineStr + "T12:00:00");
+      if (isNaN(d.getTime())) errors.deadline = "Must be a valid date (YYYY-MM-DD).";
     }
-    if (Object.keys(updates).length > 0) await updateSalesGoal(updates as any);
+
+    if (Object.keys(errors).length > 0) {
+      setGoalFormErrors(errors);
+      if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return;
+    }
+    setGoalFormErrors({});
+    const updates: Record<string, unknown> = {
+      currentSales: current,
+      goalAmount: goal,
+      goalDeadline: deadlineStr,
+    };
+    await updateSalesGoal(updates as any);
     setShowEditGoal(false);
     if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
@@ -208,7 +231,7 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer className="flex-1">
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View className="px-5 pt-4 pb-2 flex-row items-start justify-between">
           <View className="flex-1">
@@ -578,64 +601,104 @@ export default function HomeScreen() {
 
       {/* ═══ Edit Sales Goal Modal ═══ */}
       <Modal visible={showEditGoal} animationType="slide" transparent>
-        <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <View className="rounded-t-3xl p-5 pb-10" style={{ backgroundColor: colors.background }}>
-            <View className="flex-row items-center justify-between mb-5">
-              <TouchableOpacity onPress={() => setShowEditGoal(false)} activeOpacity={0.7}>
-                <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
-              </TouchableOpacity>
-              <Text className="text-lg font-bold" style={{ color: colors.foreground }}>Edit Sales Goal</Text>
-              <TouchableOpacity onPress={handleSaveGoal} activeOpacity={0.7}>
-                <Text className="text-base font-bold" style={{ color: colors.primary }}>Save</Text>
-              </TouchableOpacity>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+            <View className="flex-1 justify-end" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+              <View className="rounded-t-3xl p-5 pb-10" style={{ backgroundColor: colors.background }}>
+                <View className="flex-row items-center justify-between mb-5">
+                  <TouchableOpacity onPress={() => setShowEditGoal(false)} activeOpacity={0.7}>
+                    <Text className="text-base" style={{ color: colors.muted }}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text className="text-lg font-bold" style={{ color: colors.foreground }}>Edit Sales Goal</Text>
+                  <TouchableOpacity onPress={handleSaveGoal} activeOpacity={0.7}>
+                    <Text className="text-base font-bold" style={{ color: colors.primary }}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
+                  Current Sales ($)
+                </Text>
+                <TextInput
+                  value={editCurrentSales}
+                  onChangeText={(text) => {
+                    setEditCurrentSales(text);
+                    if (goalFormErrors.currentSales) setGoalFormErrors((prev) => ({ ...prev, currentSales: undefined }));
+                  }}
+                  // keyboardType="numeric"
+                  placeholder="e.g. 4900000"
+                  placeholderTextColor={colors.muted}
+                  returnKeyType="done"
+                  className="rounded-xl p-4 mb-4 text-base"
+                  style={{
+                    backgroundColor: colors.surface,
+                    color: colors.foreground,
+                    borderWidth: goalFormErrors.currentSales ? 1.5 : 1,
+                    borderColor: goalFormErrors.currentSales ? colors.error : colors.border,
+                  }}
+                />
+                {goalFormErrors.currentSales ? (
+                  <Text className="text-sm mb-4" style={{ color: colors.error }}>{goalFormErrors.currentSales}</Text>
+                ) : null}
+
+                <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
+                  Sales Goal ($)
+                </Text>
+                <TextInput
+                  value={editGoalAmount}
+                  onChangeText={(text) => {
+                    setEditGoalAmount(text);
+                    if (goalFormErrors.goalAmount) setGoalFormErrors((prev) => ({ ...prev, goalAmount: undefined }));
+                  }}
+                  // keyboardType="numeric"
+                  placeholder="e.g. 12000000"
+                  placeholderTextColor={colors.muted}
+                  returnKeyType="done"
+                  className="rounded-xl p-4 mb-4 text-base"
+                  style={{
+                    backgroundColor: colors.surface,
+                    color: colors.foreground,
+                    borderWidth: goalFormErrors.goalAmount ? 1.5 : 1,
+                    borderColor: goalFormErrors.goalAmount ? colors.error : colors.border,
+                  }}
+                />
+                {goalFormErrors.goalAmount ? (
+                  <Text className="text-sm mb-4" style={{ color: colors.error }}>{goalFormErrors.goalAmount}</Text>
+                ) : null}
+
+                <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
+                  Goal Deadline (YYYY-MM-DD)
+                </Text>
+                <TextInput
+                  value={editDeadline}
+                  onChangeText={(text) => {
+                    setEditDeadline(text);
+                    if (goalFormErrors.deadline) setGoalFormErrors((prev) => ({ ...prev, deadline: undefined }));
+                  }}
+                  placeholder="e.g. 2026-12-01"
+                  placeholderTextColor={colors.muted}
+                  returnKeyType="done"
+                  className="rounded-xl p-4 mb-4 text-base"
+                  style={{
+                    backgroundColor: colors.surface,
+                    color: colors.foreground,
+                    borderWidth: goalFormErrors.deadline ? 1.5 : 1,
+                    borderColor: goalFormErrors.deadline ? colors.error : colors.border,
+                  }}
+                />
+                {goalFormErrors.deadline ? (
+                  <Text className="text-sm mb-4" style={{ color: colors.error }}>{goalFormErrors.deadline}</Text>
+                ) : null}
+
+                <Text className="text-xs text-center mt-2" style={{ color: colors.muted }}>
+                  Work days are counted Mon–Fri. Daily target = remaining ÷ work days left.
+                </Text>
+              </View>
             </View>
-
-            <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
-              Current Sales ($)
-            </Text>
-            <TextInput
-              value={editCurrentSales}
-              onChangeText={setEditCurrentSales}
-              keyboardType="numeric"
-              placeholder="e.g. 4900000"
-              placeholderTextColor={colors.muted}
-              returnKeyType="done"
-              className="rounded-xl p-4 mb-4 text-base"
-              style={{ backgroundColor: colors.surface, color: colors.foreground, borderWidth: 1, borderColor: colors.border }}
-            />
-
-            <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
-              Sales Goal ($)
-            </Text>
-            <TextInput
-              value={editGoalAmount}
-              onChangeText={setEditGoalAmount}
-              keyboardType="numeric"
-              placeholder="e.g. 12000000"
-              placeholderTextColor={colors.muted}
-              returnKeyType="done"
-              className="rounded-xl p-4 mb-4 text-base"
-              style={{ backgroundColor: colors.surface, color: colors.foreground, borderWidth: 1, borderColor: colors.border }}
-            />
-
-            <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
-              Goal Deadline (YYYY-MM-DD)
-            </Text>
-            <TextInput
-              value={editDeadline}
-              onChangeText={setEditDeadline}
-              placeholder="e.g. 2026-12-01"
-              placeholderTextColor={colors.muted}
-              returnKeyType="done"
-              className="rounded-xl p-4 mb-4 text-base"
-              style={{ backgroundColor: colors.surface, color: colors.foreground, borderWidth: 1, borderColor: colors.border }}
-            />
-
-            <Text className="text-xs text-center mt-2" style={{ color: colors.muted }}>
-              Work days are counted Mon–Fri. Daily target = remaining ÷ work days left.
-            </Text>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </ScreenContainer>
   );
