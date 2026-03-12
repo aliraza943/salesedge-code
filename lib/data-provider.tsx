@@ -141,8 +141,10 @@ export function useData(): DataContextType {
 // ─── Provider ──────────────────────────────────────────
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth({ autoFetch: true });
-  const isCloudMode = isAuthenticated && !!user;
+  const { user, isAuthenticated, loading } = useAuth({ autoFetch: true });
+  console.log("isAuthenticated", isAuthenticated, !!user)
+
+  const isCloudMode = !loading && isAuthenticated && !!user;
 
   const [events, setEvents] = useState<LocalEvent[]>([]);
   const [rfps, setRfps] = useState<LocalRfp[]>([]);
