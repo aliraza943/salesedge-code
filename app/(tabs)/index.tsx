@@ -198,23 +198,6 @@ export default function HomeScreen() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <ScreenContainer className="flex-1 items-center justify-center">
-        <View className="items-center gap-4">
-          <Image
-            source={require("@/assets/images/icon.png")}
-            style={{ width: 120, height: 120, borderRadius: 24 }}
-            contentFit="contain"
-          />
-          <Text className="text-2xl font-bold" style={{ color: colors.foreground }}>SalesEdge</Text>
-          <Text className="text-sm" style={{ color: colors.muted }}>Sales Command Center</Text>
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 16 }} />
-        </View>
-      </ScreenContainer>
-    );
-  }
-
   return (
     <ScreenContainer className="flex-1">
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
