@@ -94,3 +94,26 @@ export async function getMe(): Promise<AuthUser | null> {
 export async function deleteAccount(): Promise<void> {
   await apiCall<{ ok: boolean }>("/api/auth/account", { method: "DELETE" });
 }
+
+// ─── Forgot password (OTP flow) ─────────────────────────────
+
+export async function requestForgotPasswordOtp(email: string): Promise<{ success: true; message: string }> {
+  return apiCall<{ success: true; message: string }>("/api/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim().toLowerCase() }),
+  });
+}
+
+export async function verifyOtp(email: string, otp: string): Promise<{ success: true; resetToken: string }> {
+  return apiCall<{ success: true; resetToken: string }>("/api/auth/verify-otp", {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim().toLowerCase(), otp: otp.replace(/\s/g, "") }),
+  });
+}
+
+export async function resetPassword(resetToken: string, newPassword: string): Promise<{ success: true; message: string }> {
+  return apiCall<{ success: true; message: string }>("/api/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ resetToken, newPassword }),
+  });
+}

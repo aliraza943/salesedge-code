@@ -151,7 +151,7 @@ export default function SignUpScreen() {
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="you@example.com"
+            placeholder="you@gmail.com"
             placeholderTextColor={colors.muted}
             autoCapitalize="none"
             autoCorrect={false}

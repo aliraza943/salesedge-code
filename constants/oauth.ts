@@ -33,7 +33,8 @@ export function getApiBaseUrl(): string {
       return `http://${ip}:3000`;
     }
   }
-  return "http://localhost:3000";
+  // return `http://192.168.100.180:3000`;
+  return ``;
 }
 
 export const SESSION_TOKEN_KEY = "app_session_token";
