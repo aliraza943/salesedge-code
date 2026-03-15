@@ -1,23 +1,22 @@
 /**
  * Email/password auth with MongoDB.
  * Users collection; JWT for sessions.
- * Forgot-password: OTP stored on user doc, sent via Nodemailer; reset uses same scrypt hashing as signup.
+ * Forgot-password: security question ("What city were you born in?"); answer stored hashed at signup.
  */
 
 import crypto from "crypto";
 import { SignJWT, jwtVerify } from "jose";
 import { ObjectId } from "mongodb";
 import type { Request, Response } from "express";
-import nodemailer from "nodemailer";
 import { getDb } from "./mongo-client";
 
 const COLLECTION_USERS = "users";
 const JWT_SECRET = process.env.JWT_SECRET || "salesedge-dev-secret-change-in-production";
 const SALT_LEN = 16;
 const KEY_LEN = 64;
-const OTP_EXPIRY_MINUTES = 10;
 const RESET_TOKEN_EXPIRY_MINUTES = 15;
-const OTP_RATE_LIMIT_SECONDS = 60;
+const FORGOT_PASSWORD_RATE_LIMIT_SECONDS = 60;
+const SECURITY_QUESTION = "What city were you born in?";
 
 /** In-memory rate limit: email -> last request timestamp (ms). */
 const forgotPasswordRateLimit = new Map<string, number>();
@@ -29,10 +28,8 @@ export type UserDocument = {
   email: string;
   passwordHash: string;
   createdAt: string;
-  /** 6-digit OTP for password reset */
-  passwordResetOtp?: string;
-  /** ISO date string; OTP valid until this time */
-  passwordResetOtpExpiresAt?: string;
+  /** Hashed answer to security question (set at signup). */
+  securityAnswerHash?: string;
 };
 
 declare global {
@@ -103,65 +100,6 @@ export async function verifyResetToken(token: string): Promise<string | null> {
   }
 }
 
-function generateOtp(): string {
-  return String(crypto.randomInt(100_000, 1_000_000));
-}
-
-function getOtpExpiresAt(): string {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() + OTP_EXPIRY_MINUTES);
-  return d.toISOString();
-}
-
-async function sendOtpEmail(to: string, otp: string): Promise<void> {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const host = process.env.SMTP_HOST || "smtp.gmail.com";
-  const port = parseInt(process.env.SMTP_PORT || "587", 10);
-  const from = process.env.SMTP_FROM || user;
-
-  if (!user || !pass) {
-    console.warn("[auth-mongo] SMTP not configured (SMTP_USER/SMTP_PASS). OTP would be:", otp);
-    throw new Error("Email is not configured. Please set SMTP_USER and SMTP_PASS.");
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port,
-    secure: port === 465,
-    auth: { user, pass },
-  });
-
-await transporter.sendMail({
-  from: from || "noreply@example.com",
-  to,
-  subject: "Your Password Reset Code",
-  text: `Your password reset code is: ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes. If you didn't request this, please ignore this email.`,
-  html: `
-  <div style="font-family: Arial, sans-serif; background: linear-gradient(135deg, #f0f4ff, #d9e6ff); padding: 50px 0; min-height: 100vh;">
-    <div style="max-width: 600px; margin: auto; background: #ffffff; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-      <h2 style="text-align: center; color: #1a1a1a; margin-bottom: 20px;">Password Reset Request</h2>
-      <p style="font-size: 16px; color: #555;">
-        You recently requested to reset your password. Use the code below to reset it. This code is valid for <strong>${OTP_EXPIRY_MINUTES} minutes</strong>.
-      </p>
-      <div style="text-align: center; margin: 30px 0;">
-        <span style="font-size: 32px; font-weight: bold; color: #ffffff; background-color: #007BFF; padding: 20px 30px; border-radius: 8px; display: inline-block; letter-spacing: 3px;">
-          ${otp}
-        </span>
-      </div>
-      <p style="font-size: 14px; color: #888; text-align: center;">
-        If you didn't request a password reset, you can safely ignore this email. Your account is secure.
-      </p>
-      <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
-      <p style="font-size: 12px; color: #aaa; text-align: center;">
-        © ${new Date().getFullYear()} SalesEdge Pro. All rights reserved.
-      </p>
-    </div>
-  </div>
-  `,
-});
-}
-
 /** Middleware: set req.userId from Authorization Bearer token. Does not block if missing. */
 export async function authOptional(req: Request, _res: Response, next: () => void): Promise<void> {
   const auth = req.headers.authorization;
@@ -207,9 +145,14 @@ export async function signup(req: Request, res: Response): Promise<void> {
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
     const confirmPassword = typeof body.confirmPassword === "string" ? body.confirmPassword : "";
+    const securityAnswer = typeof body.securityAnswer === "string" ? body.securityAnswer.trim() : "";
 
     if (!name || !username || !email || !password) {
       res.status(400).json({ error: "Name, username, email and password are required" });
+      return;
+    }
+    if (!securityAnswer) {
+      res.status(400).json({ error: "Security answer is required. It will be used if you forget your password." });
       return;
     }
     if (password !== confirmPassword) {
@@ -238,6 +181,7 @@ export async function signup(req: Request, res: Response): Promise<void> {
       username,
       email,
       passwordHash: hashPassword(password),
+      securityAnswerHash: hashPassword(securityAnswer),
       createdAt: new Date().toISOString(),
     };
     const result = await col.insertOne(doc as UserDocument & { _id?: ObjectId });
@@ -311,7 +255,7 @@ export async function logout(_req: Request, res: Response): Promise<void> {
   res.json({ ok: true });
 }
 
-/** POST /api/auth/forgot-password: request OTP for email. Rate-limited. */
+/** POST /api/auth/forgot-password: validate email and return security question (no email sent). Rate-limited. */
 export async function forgotPassword(req: Request, res: Response): Promise<void> {
   try {
     const body = req.body as Record<string, unknown>;
@@ -329,10 +273,10 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
 
     const now = Date.now();
     const last = forgotPasswordRateLimit.get(email) ?? 0;
-    if (now - last < OTP_RATE_LIMIT_SECONDS * 1000) {
-      const waitSec = Math.ceil((OTP_RATE_LIMIT_SECONDS * 1000 - (now - last)) / 1000);
+    if (now - last < FORGOT_PASSWORD_RATE_LIMIT_SECONDS * 1000) {
+      const waitSec = Math.ceil((FORGOT_PASSWORD_RATE_LIMIT_SECONDS * 1000 - (now - last)) / 1000);
       res.status(429).json({
-        error: `Please wait ${waitSec} seconds before requesting another code`,
+        error: `Please wait ${waitSec} seconds before trying again`,
       });
       return;
     }
@@ -346,74 +290,56 @@ export async function forgotPassword(req: Request, res: Response): Promise<void>
       return;
     }
 
-    const otp = generateOtp();
-    const expiresAt = getOtpExpiresAt();
-
-    await col.updateOne(
-      { _id: (user as UserDocument & { _id: ObjectId })._id },
-      { $set: { passwordResetOtp: otp, passwordResetOtpExpiresAt: expiresAt } },
-    );
-
-    try {
-      await sendOtpEmail(email, otp);
-    } catch (mailErr) {
-      console.error("[auth-mongo] sendOtpEmail error:", mailErr);
-      res.status(503).json({ error: "Unable to send email. Please try again later." });
+    const doc = user as UserDocument & { _id: ObjectId };
+    if (!doc.securityAnswerHash) {
+      res.status(400).json({
+        error: "This account does not have a security answer set. Please contact support.",
+      });
       return;
     }
 
     forgotPasswordRateLimit.set(email, now);
-    res.status(200).json({ success: true, message: "If an account exists with this email, you will receive a reset code." });
+    res.status(200).json({ success: true, securityQuestion: SECURITY_QUESTION });
   } catch (err) {
     console.error("[auth-mongo] forgotPassword error:", err);
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }
 
-/** POST /api/auth/verify-otp: validate OTP and return short-lived reset token. */
-export async function verifyOtp(req: Request, res: Response): Promise<void> {
+/** POST /api/auth/verify-security-answer: validate answer and return short-lived reset token. */
+export async function verifySecurityAnswer(req: Request, res: Response): Promise<void> {
   try {
     const body = req.body as Record<string, unknown>;
     const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
-    const otp = typeof body.otp === "string" ? body.otp.trim().replace(/\s/g, "") : "";
+    const answer = typeof body.answer === "string" ? body.answer.trim() : "";
 
-    if (!email || !otp) {
-      res.status(400).json({ error: "Email and OTP are required" });
-      return;
-    }
-    if (!/^\d{6}$/.test(otp)) {
-      res.status(400).json({ error: "OTP must be 6 digits" });
+    if (!email || !answer) {
+      res.status(400).json({ error: "Email and security answer are required" });
       return;
     }
 
     const col = await getUsersCol();
     const user = await col.findOne({ email });
     if (!user) {
-      res.status(400).json({ error: "Invalid or expired code" });
+      res.status(400).json({ error: "Invalid request" });
       return;
     }
 
     const doc = user as UserDocument & { _id: ObjectId };
-    const storedOtp = doc.passwordResetOtp;
-    const expiresAt = doc.passwordResetOtpExpiresAt;
+    if (!doc.securityAnswerHash) {
+      res.status(400).json({ error: "Invalid request" });
+      return;
+    }
 
-    if (!storedOtp || !expiresAt) {
-      res.status(400).json({ error: "Invalid or expired code" });
-      return;
-    }
-    if (new Date(expiresAt) < new Date()) {
-      res.status(400).json({ error: "This code has expired. Please request a new one." });
-      return;
-    }
-    if (storedOtp !== otp) {
-      res.status(400).json({ error: "Invalid or expired code" });
+    if (!verifyPassword(answer, doc.securityAnswerHash)) {
+      res.status(400).json({ error: "Security answer is incorrect. Please try again." });
       return;
     }
 
     const resetToken = await signResetToken(email);
     res.status(200).json({ success: true, resetToken });
   } catch (err) {
-    console.error("[auth-mongo] verifyOtp error:", err);
+    console.error("[auth-mongo] verifySecurityAnswer error:", err);
     res.status(500).json({ error: "Something went wrong. Please try again." });
   }
 }
@@ -455,10 +381,7 @@ export async function resetPassword(req: Request, res: Response): Promise<void> 
 
     await col.updateOne(
       { email },
-      {
-        $set: { passwordHash: hashed },
-        $unset: { passwordResetOtp: 1, passwordResetOtpExpiresAt: 1 } as Record<string, number>,
-      },
+      { $set: { passwordHash: hashed } },
     );
 
     res.status(200).json({ success: true, message: "Password has been reset. You can sign in with your new password." });
@@ -499,7 +422,7 @@ export function registerAuthRoutes(app: import("express").Express): void {
   app.post("/api/auth/signup", signup);
   app.post("/api/auth/login", login);
   app.post("/api/auth/forgot-password", forgotPassword);
-  app.post("/api/auth/verify-otp", verifyOtp);
+  app.post("/api/auth/verify-security-answer", verifySecurityAnswer);
   app.post("/api/auth/reset-password", resetPassword);
   app.get("/api/auth/me", authRequired, me);
   app.post("/api/auth/logout", logout);

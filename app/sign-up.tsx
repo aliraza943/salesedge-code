@@ -25,7 +25,10 @@ export default function SignUpScreen() {
   const [email, setEmail] = useState(__DEV__ ? "abc@gmail.com" : '');
   const [password, setPassword] = useState(__DEV__ ? "Testme123" : '');
   const [confirmPassword, setConfirmPassword] = useState(__DEV__ ? "Testme123" : '');
+  const [securityAnswer, setSecurityAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const SECURITY_QUESTION = "What city were you born in?";
 
   if (user) {
     return <Redirect href="/(tabs)" />;
@@ -35,8 +38,13 @@ export default function SignUpScreen() {
     const trimmedName = name.trim();
     const trimmedUsername = username.trim();
     const trimmedEmail = email.trim();
+    const trimmedSecurityAnswer = securityAnswer.trim();
     if (!trimmedName || !trimmedUsername || !trimmedEmail || !password || !confirmPassword) {
       Alert.alert("Missing fields", "Please fill in all fields.");
+      return;
+    }
+    if (!trimmedSecurityAnswer) {
+      Alert.alert("Security answer required", "Please answer the security question. You will need it if you forget your password.");
       return;
     }
     if (password !== confirmPassword) {
@@ -55,6 +63,7 @@ export default function SignUpScreen() {
         email: trimmedEmail,
         password,
         confirmPassword,
+        securityAnswer: trimmedSecurityAnswer,
       });
       router.replace("/(tabs)");
     } catch (err) {
@@ -193,13 +202,34 @@ export default function SignUpScreen() {
             placeholderTextColor={colors.muted}
             secureTextEntry
             editable={!loading}
-            className="rounded-xl border px-4 py-3  mb-6"
+            className="rounded-xl border px-4 py-3 mb-4"
             style={{
               borderColor: colors.border,
               color: colors.foreground,
               backgroundColor: colors.background,
             }}
           />
+
+          <Text className="text-sm font-medium mb-2" style={{ color: colors.foreground }}>
+            {SECURITY_QUESTION}
+          </Text>
+          <TextInput
+            value={securityAnswer}
+            onChangeText={setSecurityAnswer}
+            placeholder="Your answer"
+            placeholderTextColor={colors.muted}
+            autoCapitalize="words"
+            editable={!loading}
+            className="rounded-xl border px-4 py-3 mb-2"
+            style={{
+              borderColor: colors.border,
+              color: colors.foreground,
+              backgroundColor: colors.background,
+            }}
+          />
+          <Text className="text-xs mb-6" style={{ color: colors.muted }}>
+            Please remember or write down your security answer. It will be required if you forget your password.
+          </Text>
 
           <Pressable
             onPress={handleSignUp}

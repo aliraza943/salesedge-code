@@ -76,6 +76,7 @@ async function signUpInternal(data: {
   email: string;
   password: string;
   confirmPassword: string;
+  securityAnswer: string;
 }): Promise<Auth.User> {
   const result = await Api.signUp(data);
   await Auth.setSessionToken(result.token);
@@ -134,6 +135,7 @@ export function useAuth(options?: { autoFetch?: boolean }) {
       email: string;
       password: string;
       confirmPassword: string;
+      securityAnswer: string;
     }) => {
       return signUpInternal(data);
     },

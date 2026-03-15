@@ -1,5 +1,5 @@
-import { useRouter, Link } from "expo-router";
-import { useState } from "react";
+import { useRouter, Link, useLocalSearchParams } from "expo-router";
+import { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -15,43 +15,49 @@ import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import * as Api from "@/lib/_core/api";
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const DEFAULT_QUESTION = "What city were you born in?";
 
-export default function ForgotPasswordScreen() {
+export default function SecurityQuestionScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const params = useLocalSearchParams<{ email?: string; securityQuestion?: string }>();
+  const email = (params.email ?? "").trim().toLowerCase();
+  const securityQuestion = (params.securityQuestion ?? DEFAULT_QUESTION).trim();
+
+  const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleResetPassword = async () => {
-    const trimmed = email.trim().toLowerCase();
-    setError(null);
-    if (!trimmed) {
-      setError("Please enter your email address.");
-      return;
+  useEffect(() => {
+    if (!email) {
+      router.replace("/forgot-password");
     }
-    if (!EMAIL_REGEX.test(trimmed)) {
-      setError("Please enter a valid email address.");
+  }, [email, router]);
+
+  const handleSubmit = async () => {
+    setError(null);
+    const trimmedAnswer = answer.trim();
+    if (!trimmedAnswer) {
+      setError("Please enter your answer.");
       return;
     }
 
     setSubmitting(true);
     try {
-      const { securityQuestion } = await Api.requestPasswordReset(trimmed);
-      router.replace({
-        pathname: "/security-question",
-        params: { email: trimmed, securityQuestion: securityQuestion || "What city were you born in?" },
-      });
+      const { resetToken } = await Api.verifySecurityAnswer(email, trimmedAnswer);
+      router.replace({ pathname: "/reset-password", params: { resetToken } });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Something went wrong. Please try again.";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Incorrect answer. Please try again.");
     } finally {
       setSubmitting(false);
     }
   };
 
   const loading = submitting;
+
+  if (!email) {
+    return null;
+  }
 
   return (
     <ScreenContainer className="flex-1" edges={["top", "bottom", "left", "right"]}>
@@ -72,13 +78,13 @@ export default function ForgotPasswordScreen() {
             className="text-2xl font-bold mb-1"
             style={{ color: colors.foreground }}
           >
-            Forgot password
+            Security question
           </Text>
           <Text
             className="text-base mb-8"
             style={{ color: colors.muted }}
           >
-            Enter your registered email to reset your password. You will be asked your security question next.
+            Answer the question you set during signup to continue resetting your password.
           </Text>
 
           {error && (
@@ -94,19 +100,17 @@ export default function ForgotPasswordScreen() {
             className="text-sm font-medium mb-2"
             style={{ color: colors.foreground }}
           >
-            Email
+            {securityQuestion}
           </Text>
           <TextInput
-            value={email}
+            value={answer}
             onChangeText={(t) => {
-              setEmail(t);
+              setAnswer(t);
               setError(null);
             }}
-            placeholder="you@gmail.com"
+            placeholder="Your answer"
             placeholderTextColor={colors.muted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
+            autoCapitalize="words"
             editable={!loading}
             className="rounded-xl border px-4 py-3 mb-6"
             style={{
@@ -117,28 +121,28 @@ export default function ForgotPasswordScreen() {
           />
 
           <Pressable
-            onPress={handleResetPassword}
-            disabled={loading}
+            onPress={handleSubmit}
+            disabled={loading || !answer.trim()}
             className="rounded-xl py-3.5 items-center justify-center mb-4"
             style={{
-              backgroundColor: loading ? colors.muted : colors.primary,
+              backgroundColor: loading || !answer.trim() ? colors.muted : colors.primary,
             }}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text className="text-base font-semibold" style={{ color: "#fff" }}>
-                Reset Password
+                Continue
               </Text>
             )}
           </Pressable>
 
           <View className="flex-row justify-center items-center gap-2">
-            <Text style={{ color: colors.muted }}>Remember your password?</Text>
-            <Link href="/login" asChild>
+            <Text style={{ color: colors.muted }}>Back to</Text>
+            <Link href="/forgot-password" asChild>
               <Pressable>
                 <Text style={{ color: colors.primary, fontWeight: "600" }}>
-                  Sign in
+                  Forgot password
                 </Text>
               </Pressable>
             </Link>
