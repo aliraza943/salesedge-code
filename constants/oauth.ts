@@ -34,6 +34,8 @@ export function getApiBaseUrl(): string {
     }
   }
   // return `http://192.168.100.180:3000`;
+  // return `http://172.20.10.3:3000`;
+  // return `http://10.148.46.239:3000`;
   return ``;
 }
 

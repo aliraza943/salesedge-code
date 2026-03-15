@@ -74,6 +74,201 @@ function formatDate(dateStr: string | undefined) {
   }
 }
 
+type ParsedRfpFromVoice = {
+  title: string | null;
+  client: string | null;
+  brokerContact: string | null;
+  lives: number | null;
+  effectiveDate: string | null;
+  premium: string | null;
+  followUpDate: string | null;
+  notes: string | null;
+};
+
+/**
+ * Parse spoken RFP text when user dictates in exact field order (e.g. comma-separated).
+ * Example: "ABC Corporation, Smith & Associates, John Smith, 250 lives, March 1st effective date, 150 thousand premium, follow up next Tuesday, notes this is a competitive takeover."
+ */
+function parseRfpTranscriptionByOrder(text: string): ParsedRfpFromVoice | null {
+  const raw = text.trim();
+  if (!raw) return null;
+  const segments = raw.split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean);
+  if (__DEV__) console.log("[RFP Voice] parseRfpTranscriptionByOrder segments", segments.length, segments);
+
+  if (segments.length < 3) return null;
+
+  const result: ParsedRfpFromVoice = {
+    title: null,
+    client: null,
+    brokerContact: null,
+    lives: null,
+    effectiveDate: null,
+    premium: null,
+    followUpDate: null,
+    notes: null,
+  };
+
+  const take = (idx: number): string => (segments[idx] ?? "").trim();
+  const stripKeyword = (s: string, keyword: string): string => {
+    const lower = s.toLowerCase();
+    const kw = keyword.toLowerCase();
+    const i = lower.indexOf(kw);
+    if (i === -1) return s;
+    return (s.slice(0, i) + s.slice(i + kw.length)).trim().replace(/\s+/g, " ").trim();
+  };
+
+  if (segments.length >= 1 && take(0)) result.title = take(0);
+  if (segments.length >= 2 && take(1)) result.client = take(1);
+  if (segments.length >= 3 && take(2)) result.brokerContact = take(2);
+
+  if (segments.length >= 4) {
+    const livesStr = take(3).replace(/\s*lives?\s*/gi, "").replace(/\D/g, "") || take(3).replace(/\D/g, "");
+    const n = parseInt(livesStr, 10);
+    if (!isNaN(n) && n > 0) result.lives = n;
+  }
+
+  if (segments.length >= 5) {
+    let eff = take(4);
+    eff = stripKeyword(eff, "effective date");
+    eff = stripKeyword(eff, "effective");
+    if (eff) {
+      const parsed = parseSpokenDate(eff);
+      result.effectiveDate = parsed && isValidYYYYMMDD(parsed) ? parsed : null;
+    }
+  }
+
+  if (segments.length >= 6) {
+    let prem = take(5);
+    prem = stripKeyword(prem, "premium");
+    const num = parseSpokenNumber(prem);
+    if (num != null) result.premium = String(num);
+    else if (prem) result.premium = prem.replace(/[^0-9.-]/g, "");
+  }
+
+  if (segments.length >= 7) {
+    let follow = take(6);
+    follow = stripKeyword(follow, "follow up");
+    follow = stripKeyword(follow, "follow-up");
+    follow = stripKeyword(follow, "follow");
+    if (follow) {
+      const parsed = parseSpokenDate(follow);
+      result.followUpDate = parsed && isValidYYYYMMDD(parsed) ? parsed : null;
+    }
+  }
+
+  if (segments.length >= 8) {
+    let notes = take(7);
+    notes = stripKeyword(notes, "notes");
+    if (notes) result.notes = notes;
+    for (let i = 8; i < segments.length; i++) result.notes = (result.notes || "") + ", " + segments[i];
+  }
+
+  if (__DEV__) console.log("[RFP Voice] parseRfpTranscriptionByOrder result", result);
+  return result;
+}
+
+/**
+ * Parse spoken premium: always apply unit when thousand/million present. Never return only the base number.
+ * e.g. "420 thousand premium" → 420000, "1.2 million" → 1200000. Unit can appear anywhere in the string.
+ */
+function parseSpokenNumber(s: string): number | null {
+  const lower = s.toLowerCase().trim();
+  const hasThousand = /\b(thousand|thousands|k)\b/.test(lower);
+  const hasMillion = /\b(million|millions|m(?:illion)?)\b/.test(lower);
+  const numMatch = lower.match(/(\d+(?:\.\d+)?)/);
+  const n = numMatch ? parseFloat(numMatch[1]) : NaN;
+  if (!isNaN(n) && (hasThousand || hasMillion)) {
+    if (hasMillion && !hasThousand) return Math.round(n * 1000000);
+    return Math.round(n * 1000);
+  }
+  const plainNum = parseFloat(s.replace(/[^0-9.-]/g, ""));
+  return !isNaN(plainNum) && isFinite(plainNum) ? plainNum : null;
+}
+
+function isValidYYYYMMDD(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(s + "T12:00:00");
+  return !isNaN(d.getTime());
+}
+
+/**
+ * Parse relative/spoken dates into YYYY-MM-DD.
+ * Handles: "next Monday", "follow next Thursday", "Friday", "tomorrow", "in two weeks", month names, "September first", etc.
+ */
+function parseSpokenDate(s: string): string | null {
+  const raw = s.trim();
+  if (!raw) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const year = today.getFullYear();
+  const monthNames = "january february march april may june july august september october november december".split(" ");
+  const lower = raw.toLowerCase();
+  const ordinals: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10, eleventh: 11, twelfth: 12, thirteenth: 13, fourteenth: 14, fifteenth: 15, sixteenth: 16, seventeenth: 17, eighteenth: 18, nineteenth: 19, twentieth: 20, twentyfirst: 21, twentysecond: 22, twentythird: 23, twentyfourth: 24, twentyfifth: 25, twentysixth: 26, twentyseventh: 27, twentyeighth: 28, twentyninth: 29, thirtieth: 30, thirtyfirst: 31 };
+
+  const toYMD = (d: Date) => {
+    const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  if (/\btomorrow\b/.test(lower)) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + 1);
+    return toYMD(d);
+  }
+  const inWeeksMatch = lower.match(/\bin\s+(\d+)\s+weeks?\b/);
+  if (inWeeksMatch) {
+    const weeks = parseInt(inWeeksMatch[1], 10);
+    if (!isNaN(weeks)) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + 7 * weeks);
+      return toYMD(d);
+    }
+  }
+
+  const dayNames = "sunday monday tuesday wednesday thursday friday saturday".split(" ");
+  const dayMatch = lower.match(/\b(?:next\s+)?(sunday|monday|tuesday|wednesday|thursday|friday|saturday)\b/);
+  if (dayMatch) {
+    const targetDay = dayNames.indexOf(dayMatch[1].toLowerCase());
+    if (targetDay !== -1) {
+      const d = new Date(today);
+      const currentDay = d.getDay();
+      let add = targetDay - currentDay;
+      if (add <= 0) add += 7;
+      d.setDate(d.getDate() + add);
+      return toYMD(d);
+    }
+  }
+
+  const monthNameMatch = lower.match(/(january|february|march|april|may|june|july|august|september|october|november|december)\s*(?:(\d{1,2})(?:st|nd|rd|th)?|(\w+))?(?:\s*,?\s*(\d{4}))?/i);
+  if (monthNameMatch) {
+    const mi = monthNames.indexOf(monthNameMatch[1].toLowerCase());
+    if (mi !== -1) {
+      let day = 1;
+      if (monthNameMatch[2]) day = parseInt(monthNameMatch[2], 10);
+      else if (monthNameMatch[3]) {
+        const word = monthNameMatch[3].toLowerCase().replace(/\s/g, "");
+        day = ordinals[word] ?? (parseInt(word, 10) || 1);
+      }
+      const y = monthNameMatch[4] ? parseInt(monthNameMatch[4], 10) : year;
+      if (day >= 1 && day <= 31) {
+        const mm = String(mi + 1).padStart(2, "0");
+        const dd = String(day).padStart(2, "0");
+        return `${y}-${mm}-${dd}`;
+      }
+    }
+  }
+  const monthMatch = lower.match(/(\d{1,2})(?:st|nd|rd|th)\b/);
+  if (monthMatch) {
+    const num = parseInt(monthMatch[1], 10);
+    if (num >= 1 && num <= 31) {
+      const mm = String(today.getMonth() + 1).padStart(2, "0");
+      const dd = String(num).padStart(2, "0");
+      return `${year}-${mm}-${dd}`;
+    }
+  }
+  return null;
+}
+
 // Simple calendar date picker component
 function DatePicker({
   value,
@@ -657,11 +852,13 @@ export default function RfpsScreen() {
 
   const stopVoiceRecording = async () => {
     try {
+      if (__DEV__) console.log("[RFP Voice] stopVoiceRecording started, voiceTarget", voiceTarget);
       setIsRecording(false);
       setIsTranscribing(true);
 
       let audioBase64: string;
-      let mimeType = "audio/webm";
+      // Native (expo-audio) records M4A; web MediaRecorder produces WebM. Whisper needs correct format.
+      const mimeType = Platform.OS === "web" ? "audio/webm" : "audio/mp4";
 
       if (Platform.OS === "web" && webMediaRecorderRef.current) {
         // Stop web MediaRecorder and collect blob
@@ -703,54 +900,106 @@ export default function RfpsScreen() {
       });
 
       const transcribeData = await transcribeRes.json();
-      const transcribedText = transcribeData?.result?.data?.json?.text || "";
+      const transcribeJson = transcribeData?.result?.data?.json;
+      if (__DEV__) console.log("[RFP Voice] transcribe response", transcribeJson ? { textLength: (transcribeJson.text || "").length, error: transcribeJson.error } : "no json");
 
-      if (!transcribedText) {
+      const transcribedText = (transcribeJson?.text ?? "").trim();
+      const transcribeError = transcribeJson?.error;
+      const transcribeDetails = transcribeJson?.details;
+
+      if (transcribeError || transcribedText === "Transcription failed" || !transcribedText) {
         setIsTranscribing(false);
-        Alert.alert("Could not understand", "Please try speaking again more clearly.");
+        const message = transcribeError
+          ? transcribeDetails ? `${transcribeError}: ${transcribeDetails}` : transcribeError
+          : "Speech could not be transcribed. Check that the voice service is configured and try again.";
+        Alert.alert("Transcription failed", message);
         return;
       }
 
-      // Use AI to parse the transcribed text into RFP fields
+      if (__DEV__) console.log("[RFP Voice] transcribedText", transcribedText);
+
+      // Parse by exact field order first (user says: Case, Brokerage, Contact, Lives, Effective Date, Premium, Follow Up, Notes)
+      const orderParsed = parseRfpTranscriptionByOrder(transcribedText);
+      const useOrderBased = orderParsed && (
+        (orderParsed.title != null && orderParsed.title !== "") ||
+        (orderParsed.client != null && orderParsed.client !== "") ||
+        (orderParsed.brokerContact != null && orderParsed.brokerContact !== "")
+      );
+      if (__DEV__) console.log("[RFP Voice] orderParsed", orderParsed, "useOrderBased", useOrderBased);
+
+      // Also use AI for date normalization and when user doesn't speak in strict order
+      const localDate = new Date().toISOString().slice(0, 10);
       const parseRes = await fetch(`${apiBase}/api/trpc/rfpSummarize.summarize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ json: { text: transcribedText } }),
+        body: JSON.stringify({ json: { text: transcribedText, localDate } }),
       });
 
       const parseData = await parseRes.json();
-      const parsed = parseData?.result?.data?.json;
+      const aiParsed = parseData?.result?.data?.json;
+      if (__DEV__) console.log("[RFP Voice] aiParsed", aiParsed);
 
-      if (parsed) {
-        const formatPremiumValue = (val: string | null) => {
-          if (!val) return null;
-          const num = parseFloat(val.replace(/[^0-9.-]/g, ""));
-          if (isNaN(num)) return null;
-          return String(num);
-        };
+      const formatPremiumValue = (val: string | null | undefined): string | null => {
+        if (!val) return null;
+        const num = parseFloat(String(val).replace(/[^0-9.-]/g, ""));
+        if (isNaN(num)) return null;
+        return String(num);
+      };
 
+      // Normalize premium from raw segment when it contains thousand/million (avoid 420 instead of 420000)
+      const segments = transcribedText.split(/\s*,\s*/).map((s: string) => s.trim()).filter(Boolean);
+      const rawPremiumSegment = segments.length >= 6 ? segments[5] : "";
+      const premiumFromSegment = rawPremiumSegment ? parseSpokenNumber(rawPremiumSegment) : null;
+      const normalizedPremium = premiumFromSegment != null
+        ? String(premiumFromSegment)
+        : formatPremiumValue((useOrderBased && orderParsed?.premium) || aiParsed?.premium) || null;
+
+      const onlyValidDate = (v: string | null | undefined) =>
+        v && isValidYYYYMMDD(v) ? v : null;
+
+      // Merge: prefer order-based; only set dates when valid YYYY-MM-DD
+      const merged = {
+        title: aiParsed?.title || null,
+        client: aiParsed?.client || null,
+        brokerContact: aiParsed?.brokerContact || null,
+        lives: aiParsed?.lives ?? null,
+        effectiveDate: aiParsed?.effectiveDate || null,
+        premium: aiParsed?.premium,
+        followUpDate: aiParsed?.followUpDate || null,
+        notes: aiParsed?.notes || null,
+      };
+      // if (!merged.effectiveDate && aiParsed?.effectiveDate && isValidYYYYMMDD(aiParsed.effectiveDate)) merged.effectiveDate = aiParsed.effectiveDate;
+      // if (!merged.followUpDate && aiParsed?.followUpDate && isValidYYYYMMDD(aiParsed.followUpDate)) merged.followUpDate = aiParsed.followUpDate;
+      // if (!merged.followUpDate && segments.length >= 7) {
+      //   const rawFollow = segments[6].replace(/\bfollow\s+up\b/gi, "").replace(/\bfollow-up\b/gi, "").replace(/\bfollow\b/gi, "").trim();
+      //   const parsedFollow = rawFollow ? parseSpokenDate(rawFollow) : null;
+      //   if (parsedFollow && isValidYYYYMMDD(parsedFollow)) merged.followUpDate = parsedFollow;
+      // }
+
+      if (__DEV__) console.log("[RFP Voice] merged", merged);
+
+      const hasAny = merged.title || merged.client || merged.brokerContact || merged.lives != null || merged.effectiveDate || merged.premium || merged.followUpDate || merged.notes;
+      if (__DEV__) console.log("[RFP Voice] hasAny", hasAny, "voiceTarget", voiceTarget);
+      if (hasAny) {
         if (voiceTarget === "create") {
-          if (parsed.title) setFormCase(parsed.title);
-          if (parsed.client) setFormBroker(parsed.client);
-          if (parsed.brokerContact) setFormBrokerContact(parsed.brokerContact);
-          if (parsed.lives) setFormLives(String(parsed.lives));
-          if (parsed.effectiveDate) setFormEffectiveDate(parsed.effectiveDate);
-          const premVal = formatPremiumValue(parsed.premium);
-          if (premVal) setFormPremium(premVal);
-          if (parsed.followUpDate) setFormFollowUpDate(parsed.followUpDate);
-          if (parsed.notes) setFormNotes(parsed.notes);
-          // Show fields after voice input fills them
+          if (merged.title) setFormCase(merged.title);
+          if (merged.client) setFormBroker(merged.client);
+          if (merged.brokerContact) setFormBrokerContact(merged.brokerContact);
+          if (merged.lives != null) setFormLives(String(merged.lives));
+          if (merged.effectiveDate) setFormEffectiveDate(merged.effectiveDate);
+          if (merged.premium) setFormPremium(merged.premium);
+          if (merged.followUpDate) setFormFollowUpDate(merged.followUpDate);
+          if (merged.notes) setFormNotes(merged.notes);
           setFieldsVisible(true);
         } else if (voiceTarget === "edit") {
-          if (parsed.title) setEditCase(parsed.title);
-          if (parsed.client) setEditBroker(parsed.client);
-          if (parsed.brokerContact) setEditBrokerContact(parsed.brokerContact);
-          if (parsed.lives) setEditLives(String(parsed.lives));
-          if (parsed.effectiveDate) setEditEffectiveDate(parsed.effectiveDate);
-          const premVal = formatPremiumValue(parsed.premium);
-          if (premVal) setEditPremium(premVal);
-          if (parsed.followUpDate) setEditFollowUpDate(parsed.followUpDate);
-          if (parsed.notes) setEditNotes(parsed.notes);
+          if (merged.title) setEditCase(merged.title);
+          if (merged.client) setEditBroker(merged.client);
+          if (merged.brokerContact) setEditBrokerContact(merged.brokerContact);
+          if (merged.lives != null) setEditLives(String(merged.lives));
+          if (merged.effectiveDate) setEditEffectiveDate(merged.effectiveDate);
+          if (merged.premium) setEditPremium(merged.premium);
+          if (merged.followUpDate) setEditFollowUpDate(merged.followUpDate);
+          if (merged.notes) setEditNotes(merged.notes);
         }
       }
 
@@ -1184,7 +1433,7 @@ export default function RfpsScreen() {
                 {!isTranscribing && (
                   <View style={{ marginTop: 16, width: "100%", paddingHorizontal: 8 }}>
                     <Text style={{ fontSize: 14, fontWeight: "600", color: colors.foreground, marginBottom: 10, textAlign: "center" }}>
-                      {isRecording ? "Say each field:" : "Say all fields in one go:"}
+                      {isRecording ? "Say each value in order:" : "Say all fields in order (or in one sentence):"}
                     </Text>
                     <View style={{ borderRadius: 12, borderWidth: 1, backgroundColor: colors.surface, borderColor: isRecording ? colors.error + "40" : colors.border, overflow: "hidden" }}>
                       {[

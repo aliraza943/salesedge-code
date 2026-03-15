@@ -29,6 +29,7 @@ import { ENV } from "./env";
 
 export type TranscribeOptions = {
   audioUrl: string; // URL to the audio file (e.g., S3 URL)
+  mimeType?: string; // Optional: use this for file extension and blob type (avoids storage Content-Type being wrong)
   language?: string; // Optional: specify language code (e.g., "en", "es", "zh")
   prompt?: string; // Optional: custom prompt for the transcription
 };
@@ -109,7 +110,8 @@ export async function transcribeAudio(
       }
 
       audioBuffer = Buffer.from(await response.arrayBuffer());
-      mimeType = response.headers.get("content-type") || "audio/mpeg";
+      // Prefer caller's mimeType so we send the correct extension to Whisper (storage may not return Content-Type)
+      mimeType = options.mimeType || response.headers.get("content-type") || "audio/webm";
 
       // Check file size (16MB limit)
       const sizeMB = audioBuffer.length / (1024 * 1024);

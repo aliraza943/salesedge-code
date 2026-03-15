@@ -895,14 +895,23 @@ export const appRouter = router({
 
         const result = await transcribeAudio({
           audioUrl: url,
+          mimeType: input.mimeType || "audio/webm",
           language: "en",
         });
 
+        if ("error" in result) {
+          return {
+            text: "",
+            error: result.error,
+            code: result.code,
+            details: result.details,
+          };
+        }
         return {
-          text:
-            "text" in result
-              ? result.text
-              : "Transcription failed",
+          text: result.text,
+          error: undefined,
+          code: undefined,
+          details: undefined,
         };
       }),
   }),

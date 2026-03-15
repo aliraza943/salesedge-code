@@ -29,7 +29,7 @@ function HideSplashWhenReady({ hasUser }: { hasUser: boolean }) {
   useEffect(() => {
     if (Platform.OS === "web") return;
     const ready = !hasUser || !isLoading;
-    if (ready) SplashScreen.hideAsync().catch(() => {});
+    if (ready) SplashScreen.hideAsync().catch(() => { });
   }, [hasUser, isLoading]);
   return null;
 }
@@ -52,7 +52,7 @@ export default function RootLayout() {
     initManusRuntime();
     if (Platform.OS !== "web") {
       configureNotifications();
-      SplashScreen.preventAutoHideAsync().catch(() => {});
+      SplashScreen.preventAutoHideAsync().catch(() => { });
     }
   }, []);
 

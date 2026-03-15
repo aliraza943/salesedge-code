@@ -185,37 +185,55 @@ export function buildPublicChatSystemPrompt(opts: {
 export function buildRfpSummarizePrompt(localDate?: string): string {
   const dateStr = localDate || new Date().toLocaleDateString("en-CA");
   return (
-    "You are an RFP data entry assistant for an insurance sales professional. The user will dictate RFP information using keyword-based voice input.\n\n" +
-    "The user will say keywords followed by values, like:\n" +
-    '- "case [name]" -> the case/RFP name\n' +
-    '- "broker [name]" -> the broker company or person name\n' +
-    '- "broker contact [name]" -> the specific broker contact person\n' +
-    '- "lives [number]" -> number of lives/employees\n' +
-    '- "effective date [date]" -> the effective date\n' +
-    '- "premium [amount]" -> the premium amount in dollars\n' +
-    '- "follow up [date]" or "next follow up [date]" -> the follow-up date\n' +
-    '- "notes [text]" -> additional notes\n\n' +
-    "The keywords may appear in any order, and the user may say them naturally.\n\n" +
+    "You are an RFP data entry assistant for an insurance sales professional. The user dictates RFP information and the app expects fields in this exact order:\n\n" +
+    "1. Case (RFP/case name)\n" +
+    "2. Brokerage (broker company name)\n" +
+    "3. Brokerage Contact (contact person at brokerage)\n" +
+    "4. Lives (number of lives/employees)\n" +
+    "5. Effective Date\n" +
+    "6. Premium (dollar amount)\n" +
+    "7. Follow Up Date\n" +
+    "8. Notes\n\n" +
+    "The user may speak in one sentence following this order, e.g.: \"ABC Corporation, Smith & Associates, John Smith, 250 lives, March 1st effective date, 150 thousand premium, follow up next Tuesday, notes this is a competitive takeover.\" " +
+    "Map each part to the corresponding field in the order above. They may also use keywords (case, brokerage, broker contact, lives, effective date, premium, follow up, notes) in any order.\n\n" +
     "Parse the input and return a JSON object with these fields (use null for any field not mentioned):\n" +
     "{\n" +
-    '  "title": "The case name (from \'case\' keyword)",\n' +
-    '  "client": "The broker name (from \'broker\' keyword, NOT \'broker contact\')",\n' +
-    '  "brokerContact": "The broker contact person (from \'broker contact\' keyword)",\n' +
+    '  "title": "The case name",\n' +
+    '  "client": "The brokerage/broker company name (NOT the contact person)",\n' +
+    '  "brokerContact": "The brokerage contact person",\n' +
     '  "lives": "Number of lives as a string (e.g. \'200\'), or null",\n' +
     '  "effectiveDate": "Date in YYYY-MM-DD format, or null. Today is ' +
     dateStr +
-    '. Convert relative dates.",\n' +
-    '  "premium": "Dollar amount as a plain number string WITHOUT dollar sign (e.g. \'150000\' not \'$150,000\'). Convert spoken amounts.",\n' +
-    '  "followUpDate": "Date in YYYY-MM-DD format, or null. Today is ' +
-    dateStr +
-    '. Convert relative dates.",\n' +
+    '. Convert relative dates (e.g. March 1st, next Tuesday).",\n' +
+    '  "premium": "See PREMIUM NORMALIZATION below.",\n' +
+    '  "followUpDate": "See FOLLOW UP DATE NORMALIZATION below.",\n' +
     '  "notes": "Any additional notes or text, or null"\n' +
     "}\n\n" +
+    "PREMIUM NORMALIZATION\n" +
+    "The premium value may be spoken using units like thousand or million. Convert these into full numeric values. Never return only the base number—always multiply by the spoken unit.\n" +
+    "Examples:\n" +
+    '- "15 thousand premium" → 15000\n' +
+    '- "150 thousand premium" → 150000\n' +
+    '- "420 thousand premium" → 420000 (never 420)\n' +
+    '- "1.2 million premium" → 1200000\n' +
+    '- "2 million premium" → 2000000\n' +
+    '- "95 thousand" → 95000\n' +
+    "Output premium as a plain number string (no $ or commas). Never return only the base number when thousand/million is spoken.\n\n" +
+    "FOLLOW UP DATE NORMALIZATION\n" +
+    "Follow up dates may be spoken as relative dates. Convert them into a valid ISO date (YYYY-MM-DD) based on today's date. Today is " +
+    dateStr +
+    ".\n" +
+    "Handle phrases such as:\n" +
+    '- "follow up next Monday" or "follow next Monday" = the next occurrence of that weekday\n' +
+    '- "follow up next Thursday" or "follow next Thursday" = the next Thursday\n' +
+    '- "follow up Friday" or "Friday" alone = the upcoming Friday (this week or next)\n' +
+    '- "follow up in two weeks" = today + 14 days\n' +
+    '- "follow up tomorrow" = today + 1 day\n' +
+    "Always output a valid calendar date (YYYY-MM-DD). Never return text like \"invalid date\" or relative phrases—only YYYY-MM-DD.\n\n" +
     "IMPORTANT RULES:\n" +
-    "- Distinguish between 'broker' (company/person) and 'broker contact' (specific contact person).\n" +
-    "- Distinguish between 'effective date' and 'follow up' / 'next follow up' — they are separate fields.\n" +
-    "- If the user just says a name without a keyword, try to infer: the first name mentioned is likely the case name.\n" +
-    "- Premium should ALWAYS be a plain number string (no $ or commas).\n" +
+    "- When the user speaks in order (e.g. comma-separated), assign the 1st segment to title, 2nd to client, 3rd to brokerContact, 4th to lives, 5th to effectiveDate, 6th to premium, 7th to followUpDate, 8th to notes.\n" +
+    "- Distinguish between brokerage (company) and broker contact (person).\n" +
+    "- Effective date and follow up date are separate fields.\n" +
     "- Only return the JSON object, nothing else."
   );
 }
